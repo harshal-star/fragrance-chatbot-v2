@@ -1,31 +1,41 @@
 import logging
+import sys
 import time
 import random
 import asyncio
-from typing import Dict, List, AsyncGenerator
+from typing import Dict, List, AsyncGenerator, Optional
 from datetime import datetime
-from app.models.schemas import SessionContext
-from app.services.session import get_session, update_session
-from app.core.utils import client, get_system_prompt, format_conversation_history
+from sqlalchemy.orm import Session
+from app.services.session import get_session, save_session
+from app.core.utils import client, get_system_prompt, format_conversation_history, logger
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure logging with UTF-8 encoding
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 
-async def generate_response(session: SessionContext, message: str) -> AsyncGenerator[str, None]:
+async def generate_response(session: Dict, message: str, db: Session) -> AsyncGenerator[str, None]:
     """Generate a streaming response for the given message using OpenAI API"""
-    # Add user message to conversation history
-    session.conversation_history.append({
-        "role": "user",
-        "content": message,
-        "timestamp": datetime.now().isoformat()
-    })
-    
     try:
+        # Ensure conversation history has the correct structure
+        if not session.get("conversation_history"):
+            session["conversation_history"] = {"messages": []}
+        
+        # Append the user's message BEFORE generating the response
+        session["conversation_history"]["messages"].append({
+            "role": "user",
+            "content": message,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
         # Format conversation history for OpenAI
         messages = [
             {"role": "system", "content": get_system_prompt()}
-        ] + format_conversation_history(session.conversation_history)
+        ] + format_conversation_history(session["conversation_history"])
         
         # Call OpenAI API with streaming
         stream = client.chat.completions.create(
@@ -64,26 +74,62 @@ async def generate_response(session: SessionContext, message: str) -> AsyncGener
             yield buffer
             full_response += buffer
         
-        # Add bot response to conversation history
-        session.conversation_history.append({
-            "role": "assistant",
-            "content": full_response,
-            "timestamp": datetime.now().isoformat()
-        })
+        # --- Append the assistant's response only if it's not a duplicate ---
+        messages_list = session["conversation_history"]["messages"]
+        logger.info(f"Messages list length before append: {len(messages_list)}")
+        if not (messages_list and messages_list[-1]["role"] == "assistant" and messages_list[-1]["content"] == full_response):
+            logger.info(f"Appending assistant message: {full_response[:50]}...")
+            messages_list.append({
+                "role": "assistant",
+                "content": full_response,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        else:
+            logger.info("Duplicate assistant message detected, not appending.")
         
-        # Update session
-        session.last_interaction = datetime.now().isoformat()
-        update_session(session)
+        # Save the updated session
+        save_session(
+            session["session_id"],
+            session.get("user_id"),
+            session,
+            db
+        )
         
     except Exception as e:
         logger.error(f"Error generating response: {str(e)}", exc_info=True)
         yield "I apologize, but I'm having trouble processing your request right now. Could you please try again?"
 
-async def process_chat_message(session_id: str, message: str) -> AsyncGenerator[str, None]:
-    """Process a chat message and return a streaming response"""
-    session = get_session(session_id)
-    if not session:
-        raise ValueError("Session not found")
-    
-    async for response_chunk in generate_response(session, message):
-        yield response_chunk 
+async def process_chat_message(
+    message: str,
+    conversation_history: List[Dict],
+    user_id: str,
+    session_id: str,
+    db: Session
+) -> Dict:
+    """
+    Process a chat message and generate a response
+    """
+    try:
+        # Add user message to conversation history
+        conversation_history.append({
+            "role": "user",
+            "content": message
+        })
+
+        # TODO: Implement actual AI response generation
+        # For now, return a simple response
+        response = {
+            "role": "assistant",
+            "content": "I'm your fragrance assistant. How can I help you today?"
+        }
+
+        # Add assistant response to conversation history
+        conversation_history.append(response)
+
+        # Save updated conversation history
+        save_session(session_id, user_id, {"conversation_history": {"messages": conversation_history}}, db)
+
+        return response
+    except Exception as e:
+        logger.error(f"Error processing chat message: {str(e)}")
+        raise 

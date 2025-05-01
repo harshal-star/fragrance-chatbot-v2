@@ -4,6 +4,8 @@ from logging.handlers import RotatingFileHandler
 from openai import OpenAI
 from dotenv import load_dotenv
 from pathlib import Path
+import tiktoken
+from typing import List, Dict
 
 # Load environment variables
 load_dotenv()
@@ -61,12 +63,48 @@ def get_system_prompt() -> str:
     """Get the system prompt for the chatbot"""
     return SYSTEM_PROMPT
 
-def format_conversation_history(history: list) -> list:
+def format_conversation_history(history: dict) -> list:
     """Format conversation history for OpenAI API"""
     formatted_history = []
-    for message in history:
+    for message in history.get("messages", []):
         formatted_history.append({
             "role": message["role"],
             "content": message["content"]
         })
-    return formatted_history 
+    return formatted_history
+
+def estimate_tokens(text: str) -> int:
+    """Estimate the number of tokens in a text string."""
+    try:
+        encoding = tiktoken.encoding_for_model("gpt-4")
+        return len(encoding.encode(text))
+    except Exception as e:
+        logger.error(f"Error estimating tokens: {str(e)}")
+        # Fallback: roughly estimate 1 token per 4 characters
+        return len(text) // 4
+
+def truncate_conversation_history(history: List[Dict], max_tokens: int = 4000) -> List[Dict]:
+    """
+    Truncate conversation history to stay within token limit.
+    Keeps the most recent messages while staying under the token limit.
+    """
+    try:
+        total_tokens = 0
+        truncated_history = []
+        
+        # Process messages in reverse order (most recent first)
+        for message in reversed(history):
+            message_tokens = estimate_tokens(message.get("content", ""))
+            
+            # If adding this message would exceed the limit, stop
+            if total_tokens + message_tokens > max_tokens:
+                break
+                
+            total_tokens += message_tokens
+            truncated_history.insert(0, message)  # Insert at beginning to maintain order
+            
+        return truncated_history
+    except Exception as e:
+        logger.error(f"Error truncating conversation history: {str(e)}")
+        # Return empty history if there's an error
+        return [] 

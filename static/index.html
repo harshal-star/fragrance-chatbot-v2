@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <title>Your Personal Fragrance Stylist</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -224,6 +225,47 @@
             transform: translateY(0);
         }
 
+        #upload-button {
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-main));
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all var(--transition-speed) ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        #upload-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(156, 39, 176, 0.2);
+        }
+
+        #upload-button:active {
+            transform: translateY(0);
+        }
+
+        #image-upload {
+            display: none;
+        }
+
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            margin: 1rem 0;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 12px var(--shadow-color);
+        }
+
+        .message-content img {
+            max-width: 100%;
+            border-radius: var(--border-radius);
+            margin-top: 0.5rem;
+        }
+
         .typing-indicator {
             background-color: var(--background-light);
             padding: 0.75rem 1.5rem;
@@ -385,6 +427,14 @@
         </div>
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
+            <input type="file" id="image-upload" accept="image/*" onchange="handleImageUpload(event)">
+            <button id="upload-button" onclick="document.getElementById('image-upload').click()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+            </button>
             <button id="send-button" onclick="sendMessage()">
                 <span>Send</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -402,7 +452,7 @@
         let typingTimeout;
         let currentStreamingMessage = null;
         
-        const API_BASE_URL = '/api';
+        const API_BASE_URL = '/api/v1';
         const START_SESSION_URL = `${API_BASE_URL}/start-session`;
         const CHAT_URL = `${API_BASE_URL}/chat`;
         
@@ -410,9 +460,30 @@
         localStorage.setItem('userId', userId);
 
         function formatMessage(message) {
-            message = message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            message = message.replace(/\*(.*?)\*/g, '<em>$1</em>');
-            message = message.replace(/\n/g, '<br>');
+            // Handle markdown formatting
+            message = message.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            
+            // Handle bullet points with proper indentation
+            message = message.replace(/^\s*[•-]\s*/gm, '• ');
+            
+            // Convert actual newlines and escaped newlines
+            message = message.replace(/\\n/g, '\n');  // Convert escaped newlines to actual newlines first
+            message = message.replace(/\n\n/g, '<br><br>');  // Convert double newlines
+            message = message.replace(/\n/g, '<br>');  // Convert single newlines
+            
+            // Handle any remaining escaped characters
+            message = message.replace(/\\/g, '');
+            
+            // Clean up any extra spaces around HTML tags
+            message = message.replace(/\s*(<br>)\s*/g, '$1');
+            message = message.replace(/(<br>){3,}/g, '<br><br>');
+            
+            // Add spacing after numbered sections
+            message = message.replace(/(\d+\.)\s+([^:]+):/g, '<br><strong>$1 $2:</strong><br>');
+            
+            // Clean up any leading/trailing spaces
+            message = message.trim();
+            
             return message;
         }
 
@@ -469,9 +540,7 @@
             const { messageDiv, contentDiv } = createMessageElement(false);
             
             contentDiv.className += ' streaming-content';
-            const cursor = document.createElement('span');
-            cursor.className = 'streaming-cursor';
-            contentDiv.appendChild(cursor);
+            contentDiv.innerHTML = '<span class="streaming-cursor">|</span>';
             
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTo({
@@ -485,13 +554,23 @@
 
         function updateStreamingResponse(text) {
             if (currentStreamingMessage) {
-                currentStreamingMessage.innerHTML = formatMessage(text) + '<span class="streaming-cursor"></span>';
+                const formattedText = formatMessage(text);
+                currentStreamingMessage.innerHTML = formattedText + '<span class="streaming-cursor">|</span>';
+                
+                const chatMessages = document.getElementById('chat-messages');
+                chatMessages.scrollTo({
+                    top: chatMessages.scrollHeight,
+                    behavior: 'smooth'
+                });
             }
         }
 
         function endStreamingResponse() {
             if (currentStreamingMessage) {
-                currentStreamingMessage.innerHTML = formatMessage(currentStreamingMessage.textContent);
+                const cursor = currentStreamingMessage.querySelector('.streaming-cursor');
+                if (cursor) {
+                    cursor.remove();
+                }
                 currentStreamingMessage = null;
             }
         }
@@ -524,29 +603,25 @@
             }
         }
 
-        async function startNewSession(isNewChat = false) {
+        async function startSession() {
             try {
-                const response = await fetch(START_SESSION_URL, {
+                const response = await fetch('/api/v1/start-session', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        user_id: userId,
-                        is_new_chat: isNewChat
+                        user_id: userId
                     })
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
                 const data = await response.json();
                 sessionId = data.session_id;
+                addMessage(data.message, false);
                 return data.message;
             } catch (error) {
                 console.error('Error starting session:', error);
-                return 'Sorry, I encountered an error starting our conversation. Please try again.';
+                addMessage('Sorry, I encountered an error. Please try again.', false);
+                throw error;
             }
         }
 
@@ -636,8 +711,7 @@
             try {
                 // Check if this is the first time user is visiting
                 const isFirstVisit = !localStorage.getItem('hasVisited');
-                const welcomeMessage = await startNewSession(isFirstVisit);
-                addMessage(welcomeMessage, false);
+                await startSession();  // Don't add message here since startSession already does it
                 
                 // Mark that user has visited
                 localStorage.setItem('hasVisited', 'true');
@@ -665,7 +739,7 @@
                 sessionId = null;
                 
                 // Start a new session with isNewChat flag
-                const welcomeMessage = await startNewSession(true);
+                const welcomeMessage = await startSession();
                 
                 // Add the welcome message
                 addMessage(welcomeMessage, false);
@@ -675,6 +749,95 @@
             } catch (error) {
                 console.error('Error starting new conversation:', error);
                 addMessage('Sorry, there was an error starting a new conversation. Please try again.', false);
+            }
+        }
+
+        async function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'image-preview';
+                document.getElementById('chat-messages').appendChild(img);
+            };
+            reader.readAsDataURL(file);
+
+            // Add user message
+            addMessage("I've uploaded a photo of myself", true);
+
+            try {
+                // Convert image to base64
+                const base64Image = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = error => reject(error);
+                    reader.readAsDataURL(file);
+                });
+
+                // Send image to server
+                const response = await fetch(CHAT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        message: "I've uploaded a photo of myself",
+                        image_data: base64Image
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Get the response data
+                const data = await response.json();
+                
+                // Add the bot's response to the chat
+                addMessage(data.message, false);
+
+                // Update status to "Seen" after a short delay
+                setTimeout(() => {
+                    const statuses = document.getElementsByClassName('message-status');
+                    if (statuses.length > 0) {
+                        statuses[statuses.length - 1].textContent = 'Seen';
+                    }
+                }, 1000);
+
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('Sorry, there was an error processing your image. Please try again.', false);
+            }
+        }
+
+        async function startNewSession(isNewChat = false) {
+            try {
+                const response = await fetch(START_SESSION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        is_new_chat: isNewChat
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                sessionId = data.session_id;
+                return data.message;
+            } catch (error) {
+                console.error('Error starting session:', error);
+                return 'Sorry, I encountered an error starting our conversation. Please try again.';
             }
         }
     </script>
