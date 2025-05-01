@@ -252,12 +252,46 @@
             display: none;
         }
 
+        .image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 15px 0;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.03);
+            border-radius: 12px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
         .image-preview {
             max-width: 200px;
             max-height: 200px;
-            margin: 1rem 0;
-            border-radius: var(--border-radius);
-            box-shadow: 0 4px 12px var(--shadow-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            object-fit: cover;
+        }
+
+        .image-preview:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .image-analysis-section {
+            margin: 15px 0;
+            padding: 15px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-main);
+            color: var(--text-primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .image-analysis-header {
+            font-weight: 600;
+            color: var(--primary-main);
+            margin-bottom: 12px;
+            font-size: 1.1em;
         }
 
         .message-content img {
@@ -360,6 +394,29 @@
             .typing-indicator {
                 background-color: #2A2A2A;
             }
+
+            .image-analysis-section {
+                background-color: #2A2A2A;
+                color: var(--text-primary);
+                border-left: 4px solid var(--primary-main);
+            }
+
+            .image-analysis-header {
+                color: var(--primary-light);
+            }
+
+            .image-preview-container {
+                background-color: rgba(255, 255, 255, 0.05);
+                box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+
+            .image-preview {
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }
+
+            .image-preview:hover {
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+            }
         }
 
         /* Mobile Responsiveness */
@@ -427,7 +484,7 @@
         </div>
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
-            <input type="file" id="image-upload" accept="image/*" onchange="handleImageUpload(event)">
+            <input type="file" id="image-upload" accept="image/*" multiple style="display: none;" onchange="handleImageUpload(event)">
             <button id="upload-button" onclick="document.getElementById('image-upload').click()">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -753,23 +810,33 @@
         }
 
         async function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
 
-            // Show preview
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                img.className = 'image-preview';
-                document.getElementById('chat-messages').appendChild(img);
-            };
-            reader.readAsDataURL(file);
+            // Add user message about multiple images
+            addMessage(`I've uploaded ${files.length} photo${files.length > 1 ? 's' : ''} of myself`, true);
 
-            // Add user message
-            addMessage("I've uploaded a photo of myself", true);
+            // Create image preview container
+            const previewContainer = document.createElement('div');
+            previewContainer.className = 'image-preview-container';
+            document.getElementById('chat-messages').appendChild(previewContainer);
 
-            try {
+            // Show loading indicator
+            const loadingMessage = addMessage('Analyzing your images...', false);
+
+            // Process all images in parallel
+            const imagePromises = Array.from(files).map(async (file, index) => {
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'image-preview';
+                    img.alt = `Image ${index + 1}`;
+                    previewContainer.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+
                 // Convert image to base64
                 const base64Image = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -786,7 +853,7 @@
                     },
                     body: JSON.stringify({
                         session_id: sessionId,
-                        message: "I've uploaded a photo of myself",
+                        message: `Analyzing image ${index + 1} of ${files.length}`,
                         image_data: base64Image
                     })
                 });
@@ -795,11 +862,32 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                // Get the response data
-                const data = await response.json();
+                return response.json();
+            });
+
+            try {
+                // Wait for all images to be processed
+                const responses = await Promise.all(imagePromises);
                 
-                // Add the bot's response to the chat
-                addMessage(data.message, false);
+                // Remove loading message
+                loadingMessage.parentElement.remove();
+                
+                // Display responses in order
+                responses.forEach((data, index) => {
+                    const analysisSection = document.createElement('div');
+                    analysisSection.className = 'image-analysis-section';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'image-analysis-header';
+                    header.textContent = `Analysis for image ${index + 1}:`;
+                    
+                    const content = document.createElement('div');
+                    content.innerHTML = formatMessage(data.message);
+                    
+                    analysisSection.appendChild(header);
+                    analysisSection.appendChild(content);
+                    document.getElementById('chat-messages').appendChild(analysisSection);
+                });
 
                 // Update status to "Seen" after a short delay
                 setTimeout(() => {
@@ -810,8 +898,8 @@
                 }, 1000);
 
             } catch (error) {
-                console.error('Error:', error);
-                addMessage('Sorry, there was an error processing your image. Please try again.', false);
+                console.error('Error processing images:', error);
+                addMessage('Sorry, there was an error processing one or more images. Please try again.', false);
             }
         }
 
