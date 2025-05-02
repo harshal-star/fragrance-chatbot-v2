@@ -1,81 +1,49 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.models.schemas import ChatRequest, ChatResponse, ImageUploadRequest
 from app.services.chat import ChatService
 from app.database import get_db
 from fastapi.responses import StreamingResponse
 import logging
+from typing import List, Dict
+from app.core.config import settings
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+class StartSessionRequest(BaseModel):
+    user_id: str
+
+class ChatRequest(BaseModel):
+    session_id: str
+    message: str
+
 router = APIRouter(tags=["chat"])
 
-@router.post("/start-session", response_model=ChatResponse)
-async def start_session(request: dict = None, db: Session = Depends(get_db)):
+@router.post("/start-session", response_model=Dict)
+async def start_session(request: StartSessionRequest, db: Session = Depends(get_db)):
     """Start a new chat session."""
     try:
-        chat_service = ChatService(db)
-        # Use provided user_id or generate a new one
-        user_id = request.get("user_id") if request else None
-        result = await chat_service.start_chat(user_id)
-        return ChatResponse(
-            message=result["message"],
-            session_id=result["session_id"]
-        )
+        chat_service = ChatService(db, settings)
+        return await chat_service.start_chat(request.user_id)
     except Exception as e:
         logger.error(f"Error starting session: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to start chat session")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat")
-async def chat(request: ChatRequest, db: Session = Depends(get_db)):
-    """Process a chat message."""
+async def chat(request: ChatRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Process a chat message and stream the response."""
     try:
-        chat_service = ChatService(db)
-        session = chat_service.get_session(request.session_id, db)
-        if not session:
-            raise ValueError("Session not found")
-
-        # Process message with image data if provided
-        if hasattr(request, 'image_data') and request.image_data:
-            result = await chat_service.process_message(
-                request.session_id,
-                request.message,
-                request.image_data
-            )
-            return ChatResponse(
-                message=result["message"],
-                image_analysis=result.get("analysis", ""),
-                session_id=request.session_id
-            )
-
-        # For regular messages, stream the response
-        async def generate():
-            try:
-                async for chunk in chat_service.generate_response(session, request.message, db):
-                    if chunk:
-                        yield f"data: {chunk}\n\n"
-                yield "data: [DONE]\n\n"
-            except Exception as e:
-                logger.error(f"Error in chat stream: {str(e)}")
-                yield f"data: Error: {str(e)}\n\n"
-                yield "data: [DONE]\n\n"
-
+        chat_service = ChatService(db, settings)
         return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no"
-            }
+            chat_service.process_message_stream(
+                request.session_id, request.message, background_tasks
+            ),
+            media_type="text/event-stream"
         )
-
-    except ValueError as e:
-        logger.error(f"Session not found: {str(e)}")
-        raise HTTPException(status_code=404, detail="Session not found")
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to process message")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/health")
 async def health_check():

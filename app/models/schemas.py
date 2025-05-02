@@ -37,7 +37,7 @@ class UserBase(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
     """Model for creating a new user"""
     user_id: str
 
@@ -73,21 +73,20 @@ class UserProfileResponse(BaseModel):
 
 class ScentPreferencesCreate(BaseModel):
     """Model for creating scent preferences"""
-    favorite_fragrances: Optional[List[str]] = []
-    preferred_notes: Optional[List[str]] = []
-    disliked_notes: Optional[List[str]] = []
-    preferred_seasons: Optional[List[str]] = []
-    preferred_occasions: Optional[List[str]] = []
+    user_id: str
+    favorite_scents: List[str] = []
+    disliked_scents: List[str] = []
+    preferred_fragrance_families: List[str] = []
+    intensity_preference: str = "medium"
 
 class ScentPreferencesResponse(BaseModel):
     """Model for scent preferences response"""
-    preference_id: int
-    session_id: str
-    favorite_fragrances: Optional[List[str]] = []
-    preferred_notes: Optional[List[str]] = []
-    disliked_notes: Optional[List[str]] = []
-    preferred_seasons: Optional[List[str]] = []
-    preferred_occasions: Optional[List[str]] = []
+    id: int
+    user_id: str
+    favorite_scents: List[str] = []
+    disliked_scents: List[str] = []
+    preferred_fragrance_families: List[str] = []
+    intensity_preference: str = "medium"
     created_at: datetime
     updated_at: datetime
 
@@ -96,19 +95,16 @@ class ScentPreferencesResponse(BaseModel):
 
 class StylePreferencesCreate(BaseModel):
     """Model for creating style preferences"""
-    fashion_style: Optional[str] = None
-    preferred_colors: Optional[List[str]] = []
-    preferred_materials: Optional[List[str]] = []
-    preferred_brands: Optional[List[str]] = []
+    user_id: str
+    clothing_style: Optional[str] = None
+    all_styles: List[str] = []
 
 class StylePreferencesResponse(BaseModel):
     """Model for style preferences response"""
-    style_id: int
-    session_id: str
-    fashion_style: Optional[str] = None
-    preferred_colors: Optional[List[str]] = []
-    preferred_materials: Optional[List[str]] = []
-    preferred_brands: Optional[List[str]] = []
+    id: int
+    user_id: str
+    clothing_style: Optional[str] = None
+    all_styles: List[str] = []
     created_at: datetime
     updated_at: datetime
 
@@ -117,19 +113,18 @@ class StylePreferencesResponse(BaseModel):
 
 class PersonalityTraitsCreate(BaseModel):
     """Model for creating personality traits"""
-    personality_type: Optional[str] = None
-    interests: Optional[List[str]] = []
-    lifestyle: Optional[str] = None
-    values: Optional[List[str]] = []
+    user_id: str
+    traits: List[str] = []
+    primary_trait: Optional[str] = None
+    confidence_score: Optional[Dict[str, float]] = None
 
 class PersonalityTraitsResponse(BaseModel):
     """Model for personality traits response"""
-    trait_id: int
-    session_id: str
-    personality_type: Optional[str] = None
-    interests: Optional[List[str]] = []
-    lifestyle: Optional[str] = None
-    values: Optional[List[str]] = []
+    id: int
+    user_id: str
+    traits: List[str] = []
+    primary_trait: Optional[str] = None
+    confidence_score: Optional[Dict[str, float]] = None
     created_at: datetime
     updated_at: datetime
 

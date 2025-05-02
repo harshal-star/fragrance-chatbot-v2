@@ -83,7 +83,7 @@ class ScentPreferences(Base):
     favorite_scents = Column(JSON, default=list)
     disliked_scents = Column(JSON, default=list)
     preferred_fragrance_families = Column(JSON, default=list)
-    intensity_preference = Column(String, nullable=True)
+    intensity_preference = Column(String, default="medium")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -95,10 +95,10 @@ class ScentPreferences(Base):
         return {
             "id": self.id,
             "user_id": self.user_id,
-            "favorite_scents": self.favorite_scents,
-            "disliked_scents": self.disliked_scents,
-            "preferred_fragrance_families": self.preferred_fragrance_families,
-            "intensity_preference": self.intensity_preference,
+            "favorite_scents": self.favorite_scents or [],
+            "disliked_scents": self.disliked_scents or [],
+            "preferred_fragrance_families": self.preferred_fragrance_families or [],
+            "intensity_preference": self.intensity_preference or "medium",
             "created_at": self.created_at,
             "updated_at": self.updated_at
         }
@@ -109,7 +109,8 @@ class StylePreferences(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
-    style_type = Column(String)
+    clothing_style = Column(String)
+    all_styles = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -121,7 +122,8 @@ class StylePreferences(Base):
         return {
             "id": self.id,
             "user_id": self.user_id,
-            "style_type": self.style_type,
+            "clothing_style": self.clothing_style,
+            "all_styles": self.all_styles or [],
             "created_at": self.created_at,
             "updated_at": self.updated_at
         }
@@ -133,6 +135,8 @@ class PersonalityTraits(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
     traits = Column(JSON, default=list)
+    primary_trait = Column(String)
+    confidence_score = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -144,7 +148,9 @@ class PersonalityTraits(Base):
         return {
             "id": self.id,
             "user_id": self.user_id,
-            "traits": self.traits,
+            "traits": self.traits or [],
+            "primary_trait": self.primary_trait,
+            "confidence_score": self.confidence_score,
             "created_at": self.created_at,
             "updated_at": self.updated_at
         } 

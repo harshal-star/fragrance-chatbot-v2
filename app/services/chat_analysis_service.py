@@ -1,37 +1,24 @@
 from typing import List, Dict, Optional
 from datetime import datetime
-import re
 from app.models.schemas import (
     UserProfileCreate, ScentPreferencesCreate,
     StylePreferencesCreate, PersonalityTraitsCreate
 )
 from app.services.profile_service import ProfileService
+from app.services.openai_profile_extraction import OpenAIProfileExtraction
 from app.core.utils import logger
+import json
 
 class ChatAnalysisService:
-    def __init__(self, profile_service: ProfileService):
+    def __init__(self, profile_service: ProfileService, openai_extraction: OpenAIProfileExtraction):
         self.profile_service = profile_service
-        self.scent_keywords = {
-            "floral": ["flower", "rose", "jasmine", "lily", "floral"],
-            "woody": ["wood", "cedar", "sandalwood", "oak", "moss"],
-            "citrus": ["citrus", "lemon", "orange", "grapefruit", "bergamot"],
-            "spicy": ["spice", "cinnamon", "pepper", "ginger", "clove"],
-            "fresh": ["fresh", "clean", "crisp", "light", "air"],
-            "sweet": ["sweet", "vanilla", "honey", "sugar", "caramel"],
-            "intense": ["strong", "intense", "powerful", "bold", "rich"],
-            "light": ["light", "subtle", "soft", "delicate", "mild"]
-        }
-        self.style_keywords = {
-            "casual": ["casual", "relaxed", "comfortable", "everyday"],
-            "formal": ["formal", "elegant", "sophisticated", "business"],
-            "sporty": ["sporty", "athletic", "active", "outdoor"],
-            "bohemian": ["bohemian", "boho", "hippie", "artistic"],
-            "minimalist": ["minimal", "simple", "clean", "modern"],
-            "vintage": ["vintage", "retro", "classic", "old-school"]
-        }
-        self.color_keywords = [
-            "black", "white", "red", "blue", "green", "yellow", "purple",
-            "pink", "orange", "brown", "gray", "navy", "beige", "gold", "silver"
+        self.openai_extraction = openai_extraction
+        self.message_buffer = []  # Store recent messages
+        self.buffer_size = 5      # Number of messages to collect before extraction
+        self.trigger_phrases = [
+            "like", "love", "prefer", "favorite", "dislike", "hate",
+            "style", "fashion", "wear", "dress", "outfit",
+            "personality", "trait", "character", "nature"
         ]
 
     async def analyze_chat_messages(self, user_id: str, messages: List[Dict[str, str]]) -> None:
@@ -39,26 +26,108 @@ class ChatAnalysisService:
         Analyze chat messages to extract user preferences and personality traits
         """
         try:
-            # Extract personality traits
-            personality_traits = await self._extract_personality_traits(messages)
-            if personality_traits:
-                await self._update_personality_traits(user_id, personality_traits)
-
-            # Extract scent preferences
-            scent_preferences = await self._extract_scent_preferences(messages)
-            if scent_preferences:
-                await self._update_scent_preferences(user_id, scent_preferences)
-
-            # Extract style preferences
-            style_preferences = await self._extract_style_preferences(messages)
-            if style_preferences:
-                await self._update_style_preferences(user_id, style_preferences)
-
-            # Update user profile based on extracted information
-            await self._update_user_profile(user_id, personality_traits, scent_preferences, style_preferences)
+            # Get only user messages
+            user_messages = [msg for msg in messages if msg["role"] == "user"]
+            print(f"\nFound {len(user_messages)} user messages")
+            
+            # Add to buffer
+            self.message_buffer.extend(user_messages)
+            
+            # Debug: Print buffer state
+            print("\n=== Message Buffer ===")
+            print(f"Buffer size: {len(self.message_buffer)}")
+            print("Messages in buffer:")
+            for msg in self.message_buffer:
+                print(f"- {msg['content']}")
+            
+            # Check if we should extract
+            should_extract = self._should_extract_profile()
+            print(f"\nShould extract: {should_extract}")
+            
+            if should_extract:
+                # Combine messages for context
+                combined_message = " ".join([msg["content"] for msg in self.message_buffer])
+                print(f"\nCombined message: {combined_message}")
+                
+                # Extract using OpenAI
+                print("\nCalling OpenAI extraction...")
+                extracted_data = await self.openai_extraction.extract_profile_data(combined_message)
+                print("\n=== Extracted Data ===")
+                print(json.dumps(extracted_data, indent=2))
+                
+                if extracted_data:
+                    # Process and save the data
+                    await self._process_extracted_data(user_id, extracted_data)
+                else:
+                    print("\nNo data extracted from OpenAI")
+                
+                # Clear buffer
+                self.message_buffer = []
+                print("\nBuffer cleared")
 
         except Exception as e:
+            print(f"\nError in analyze_chat_messages: {str(e)}")
             logger.error(f"Error analyzing chat messages: {str(e)}")
+            raise
+
+    def _should_extract_profile(self) -> bool:
+        """Determine if we should extract profile information"""
+        # Check buffer size
+        if len(self.message_buffer) >= self.buffer_size:
+            print("Extracting due to buffer size")
+            return True
+            
+        # Check for trigger phrases in the last message
+        if self.message_buffer:
+            last_message = self.message_buffer[-1]["content"].lower()
+            print(f"\nChecking last message: {last_message}")
+            for phrase in self.trigger_phrases:
+                if phrase in last_message:
+                    print(f"Found trigger phrase: {phrase}")
+                    return True
+                
+        return False
+
+    async def _process_extracted_data(self, user_id: str, extracted_data: Dict) -> None:
+        """
+        Process and save extracted profile data
+        """
+        try:
+            # Process scent preferences
+            if extracted_data["scent_preferences"]:
+                scent_prefs = extracted_data["scent_preferences"]
+                scent_prefs_create = ScentPreferencesCreate(
+                    user_id=user_id,
+                    favorite_scents=scent_prefs["favorite_scents"],
+                    disliked_scents=scent_prefs["disliked_scents"],
+                    preferred_fragrance_families=scent_prefs["preferred_fragrance_families"],
+                    intensity_preference=scent_prefs["intensity_preference"]
+                )
+                await self.profile_service.create_scent_preferences(scent_prefs_create)
+            
+            # Process style preferences
+            if extracted_data["style_preferences"]:
+                style_prefs = extracted_data["style_preferences"]
+                style_prefs_create = StylePreferencesCreate(
+                    user_id=user_id,
+                    clothing_style=style_prefs["clothing_style"],
+                    all_styles=style_prefs["all_styles"]
+                )
+                await self.profile_service.create_style_preferences(style_prefs_create)
+            
+            # Process personality traits
+            if extracted_data["personality_traits"]:
+                personality = extracted_data["personality_traits"]
+                traits_create = PersonalityTraitsCreate(
+                    user_id=user_id,
+                    traits=personality["traits"],
+                    primary_trait=personality["primary_trait"],
+                    confidence_score=personality["confidence_score"]
+                )
+                await self.profile_service.create_personality_traits(user_id, traits_create)
+
+        except Exception as e:
+            logger.error(f"Error processing extracted data: {str(e)}")
             raise
 
     async def _extract_personality_traits(self, messages: List[Dict[str, str]]) -> Optional[Dict]:
@@ -97,40 +166,60 @@ class ChatAnalysisService:
         if not messages:
             return None
 
-        user_messages = " ".join([msg["content"] for msg in messages if msg["role"] == "user"])
+        # Combine all user messages
+        user_messages = " ".join([msg["content"].lower() for msg in messages if msg["role"] == "user"])
         
-        # Extract liked and disliked scents
         favorite_scents = []
         disliked_scents = []
         preferred_families = []
         intensity_preference = "medium"
 
-        # Look for scent-related keywords
+        # Look for explicit mentions of likes/dislikes
+        like_patterns = [
+            r"(?:i )?(?:like|love|enjoy|prefer|want|looking for) (?:a |an )?([a-z, ]+)(?: scent| fragrance| smell)?",
+            r"([a-z, ]+)(?: scent| fragrance| smell)? (?:is|are) (?:nice|good|great|amazing|wonderful)"
+        ]
+        dislike_patterns = [
+            r"(?:i )?(?:dislike|hate|don't like|do not like|avoid) (?:a |an )?([a-z, ]+)(?: scent| fragrance| smell)?",
+            r"([a-z, ]+)(?: scent| fragrance| smell)? (?:is|are) (?:bad|terrible|overwhelming|too strong)"
+        ]
+
+        # Process each scent family
         for family, keywords in self.scent_keywords.items():
             if family in ["intense", "light"]:
-                if any(keyword in user_messages.lower() for keyword in keywords):
+                # Check intensity preference
+                if any(keyword in user_messages for keyword in keywords):
                     intensity_preference = family
-            else:
-                if any(keyword in user_messages.lower() for keyword in keywords):
-                    preferred_families.append(family)
+                continue
 
-        # Look for explicit mentions of likes/dislikes
-        for msg in messages:
-            if msg["role"] == "user":
-                content = msg["content"].lower()
-                if "like" in content or "love" in content:
-                    for family in self.scent_keywords:
-                        if family in content:
-                            favorite_scents.append(family)
-                elif "dislike" in content or "hate" in content:
-                    for family in self.scent_keywords:
-                        if family in content:
-                            disliked_scents.append(family)
+            # Check if any keywords for this family appear in like/dislike contexts
+            for pattern in like_patterns:
+                matches = re.finditer(pattern, user_messages)
+                for match in matches:
+                    phrase = match.group(1)
+                    if any(keyword in phrase for keyword in keywords):
+                        favorite_scents.append(family)
+                        preferred_families.append(family)
+
+            for pattern in dislike_patterns:
+                matches = re.finditer(pattern, user_messages)
+                for match in matches:
+                    phrase = match.group(1)
+                    if any(keyword in phrase for keyword in keywords):
+                        disliked_scents.append(family)
+
+        # Remove duplicates
+        favorite_scents = list(set(favorite_scents))
+        disliked_scents = list(set(disliked_scents))
+        preferred_families = list(set(preferred_families))
+
+        if not (favorite_scents or disliked_scents or preferred_families):
+            return None
 
         return {
-            "favorite_scents": list(set(favorite_scents)),
-            "disliked_scents": list(set(disliked_scents)),
-            "preferred_fragrance_families": list(set(preferred_families)),
+            "favorite_scents": favorite_scents,
+            "disliked_scents": disliked_scents,
+            "preferred_fragrance_families": preferred_families,
             "intensity_preference": intensity_preference
         }
 
@@ -141,41 +230,21 @@ class ChatAnalysisService:
         if not messages:
             return None
 
-        user_messages = " ".join([msg["content"] for msg in messages if msg["role"] == "user"])
+        user_messages = " ".join([msg["content"].lower() for msg in messages if msg["role"] == "user"])
         
-        # Extract style preferences
-        clothing_style = None
-        color_preferences = []
-        fashion_brands = []
-        accessories_preferences = []
-
-        # Determine clothing style
+        clothing_styles = []
+        
+        # Look for style mentions
         for style, keywords in self.style_keywords.items():
-            if any(keyword in user_messages.lower() for keyword in keywords):
-                clothing_style = style
-                break
+            if any(keyword in user_messages for keyword in keywords):
+                clothing_styles.append(style)
 
-        # Extract color preferences
-        for color in self.color_keywords:
-            if color in user_messages.lower():
-                color_preferences.append(color)
-
-        # Look for brand mentions (simple implementation)
-        brand_pattern = r"(gucci|prada|chanel|louis vuitton|dior|versace|ralph lauren|calvin klein|hugo boss|armani)"
-        brand_matches = re.findall(brand_pattern, user_messages.lower())
-        fashion_brands = list(set(brand_matches))
-
-        # Look for accessory mentions
-        accessory_keywords = ["bag", "watch", "jewelry", "sunglasses", "hat", "scarf", "belt"]
-        for keyword in accessory_keywords:
-            if keyword in user_messages.lower():
-                accessories_preferences.append(keyword)
+        if not clothing_styles:
+            return None
 
         return {
-            "clothing_style": clothing_style,
-            "color_preferences": color_preferences,
-            "fashion_brands": fashion_brands,
-            "accessories_preferences": accessories_preferences
+            "clothing_style": clothing_styles[0] if clothing_styles else None,  # Use first found style
+            "all_styles": clothing_styles
         }
 
     def _count_keywords(self, text: str, keywords: List[str]) -> int:
@@ -193,50 +262,62 @@ class ChatAnalysisService:
         """
         Update personality traits in the database
         """
-        existing_traits = self.profile_service.get_personality_traits(user_id)
-        if existing_traits:
-            self.profile_service.update_personality_traits(user_id, traits)
-        else:
-            traits_create = PersonalityTraitsCreate(
-                user_id=user_id,
-                traits=traits.get("traits", []),
-                confidence_score=traits.get("confidence_score", 0.0)
-            )
-            self.profile_service.create_personality_traits(traits_create)
+        try:
+            existing_traits = await self.profile_service.get_personality_traits(user_id)
+            if existing_traits:
+                await self.profile_service.update_personality_traits(user_id, traits)
+            else:
+                # Create PersonalityTraitsCreate instance
+                traits_create = PersonalityTraitsCreate(
+                    user_id=user_id,
+                    traits=traits.get("traits", []),
+                    primary_trait=traits.get("primary_trait"),
+                    confidence_score=traits.get("confidence_score", {})
+                )
+                await self.profile_service.create_personality_traits(user_id, traits_create)
+        except Exception as e:
+            logger.error(f"Error updating personality traits: {str(e)}")
+            raise
 
     async def _update_scent_preferences(self, user_id: str, preferences: Dict) -> None:
         """
         Update scent preferences in the database
         """
-        existing_preferences = self.profile_service.get_scent_preferences(user_id)
-        if existing_preferences:
-            self.profile_service.update_scent_preferences(user_id, preferences)
-        else:
-            preferences_create = ScentPreferencesCreate(
+        try:
+            # Create ScentPreferencesCreate instance
+            prefs_create = ScentPreferencesCreate(
                 user_id=user_id,
                 favorite_scents=preferences.get("favorite_scents", []),
                 disliked_scents=preferences.get("disliked_scents", []),
                 preferred_fragrance_families=preferences.get("preferred_fragrance_families", []),
                 intensity_preference=preferences.get("intensity_preference", "medium")
             )
-            self.profile_service.create_scent_preferences(preferences_create)
+
+            # Try to create new preferences
+            await self.profile_service.create_scent_preferences(prefs_create)
+            
+        except Exception as e:
+            logger.error(f"Error updating scent preferences: {str(e)}")
+            raise
 
     async def _update_style_preferences(self, user_id: str, preferences: Dict) -> None:
         """
         Update style preferences in the database
         """
-        existing_preferences = self.profile_service.get_style_preferences(user_id)
-        if existing_preferences:
-            self.profile_service.update_style_preferences(user_id, preferences)
-        else:
-            preferences_create = StylePreferencesCreate(
+        try:
+            # Create StylePreferencesCreate instance
+            prefs_create = StylePreferencesCreate(
                 user_id=user_id,
-                clothing_style=preferences.get("clothing_style", ""),
-                color_preferences=preferences.get("color_preferences", []),
-                fashion_brands=preferences.get("fashion_brands", []),
-                accessories_preferences=preferences.get("accessories_preferences", [])
+                clothing_style=preferences.get("clothing_style"),
+                all_styles=preferences.get("all_styles", [])
             )
-            self.profile_service.create_style_preferences(preferences_create)
+
+            # Try to create new preferences
+            await self.profile_service.create_style_preferences(prefs_create)
+            
+        except Exception as e:
+            logger.error(f"Error updating style preferences: {str(e)}")
+            raise
 
     async def _update_user_profile(self, user_id: str, personality_traits: Optional[Dict],
                                  scent_preferences: Optional[Dict], style_preferences: Optional[Dict]) -> None:

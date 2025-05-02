@@ -20,7 +20,7 @@ import asyncio
 from app.api.v1 import chat, profile
 from app.services.session import run_cleanup_task
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine, Base, init_db, get_db
 from app.core.utils import logger
 from sqlalchemy.orm import Session
 
@@ -48,23 +48,22 @@ app.add_middleware(
 static_dir = Path(__file__).parent.parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# Initialize database
+@app.on_event("startup")
+async def startup_event():
+    db = next(get_db())
+    try:
+        init_db(db)
+    finally:
+        db.close()
+
 # Include routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(profile.router, prefix="/api/v1", tags=["profile"])
 
-@app.on_event("startup")
-async def startup_event():
-    """Start background tasks when the application starts"""
-    logger.info("Starting application...")
-    # Start the cleanup task
-    db = Session(engine)
-    asyncio.create_task(run_cleanup_task(db))
-
 @app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup tasks when the application shuts down"""
+async def shutdown():
     logger.info("Shutting down application...")
-    # Cleanup tasks will be automatically cancelled by FastAPI
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

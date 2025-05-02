@@ -12,9 +12,18 @@ from app.services.profile_extraction import (
     extract_personality_traits
 )
 from app.services.profile_service import ProfileService
-from app.models.schemas import ChatMessage, ChatSession
+from app.services.chat_analysis_service import ChatAnalysisService
+from app.models.schemas import (
+    ChatMessage,
+    ChatSession,
+    UserCreate,
+    ScentPreferencesCreate
+)
 from app.services.image_analysis import analyze_image
 from app.core.ai.chat import generate_response
+from app.services.openai_profile_extraction import OpenAIProfileExtraction
+from app.core.config import settings, Settings
+from fastapi import BackgroundTasks
 
 # Configure logging with UTF-8 encoding
 logging.basicConfig(
@@ -26,9 +35,13 @@ logging.basicConfig(
 )
 
 class ChatService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, config: Settings):
+        self.config = config
         self.db = db
         self.user_service = UserService(db)
+        self.profile_service = ProfileService(db)
+        self.openai_extraction = OpenAIProfileExtraction(api_key=config.OPENAI_API_KEY)
+        self.analysis_service = ChatAnalysisService(self.profile_service, self.openai_extraction)
 
     def get_session(self, session_id: str, db: Session) -> Optional[Dict]:
         """Get a session by ID."""
@@ -41,9 +54,26 @@ class ChatService:
     async def start_chat(self, user_id: str) -> Dict:
         """Start a new chat session for a user."""
         try:
+            print("\n=== Starting Chat ===")
+            print(f"User ID: {user_id}")
+            
+            # Create user if not exists
+            if user_id:
+                print("Creating user...")
+                # Create UserCreate instance
+                user_create = UserCreate(user_id=user_id)
+                await self.user_service.create_user(user_create)
+                print("User created")
+            else:
+                print("No user_id provided")
+            
             session = get_session_by_user(user_id, self.db)
             if not session:
+                print("Creating new session...")
                 session = create_session(user_id, self.db)
+                print(f"New session created: {session}")
+            else:
+                print(f"Existing session found: {session}")
             
             initial_message = "Hey there! I'm Lila, your personal fragrance consultant. I'd love to help you create a fragrance that perfectly matches your style. Would you like to start by telling me a bit about yourself or sharing a photo of yourself?"
             
@@ -56,12 +86,14 @@ class ChatService:
             
             # Save session with updated history
             save_session(session["session_id"], session.get("user_id"), session, self.db)
+            print(f"Session saved with user_id: {session.get('user_id')}")
             
             return {
                 "session_id": session["session_id"],
                 "message": initial_message
             }
         except Exception as e:
+            print(f"\nError in start_chat: {str(e)}")
             logger.error(f"Error starting chat: {str(e)}")
             raise
 
@@ -141,10 +173,14 @@ class ChatService:
     async def process_message(self, session_id: str, message: str, image_data: Optional[str] = None) -> Dict:
         """Process a chat message and optionally an image."""
         try:
-            # Get session
+            print("\n=== Chat Processing ===")
+            print(f"Session ID: {session_id}")
+            print(f"Message: {message}")
+            
             session = get_session(session_id, self.db)
             if not session:
                 raise ValueError("Session not found")
+            print(f"Session found: {session}")
 
             # Add user message to history
             session["conversation_history"]["messages"].append({
@@ -152,29 +188,24 @@ class ChatService:
                 "content": message,
                 "timestamp": datetime.utcnow().isoformat()
             })
+            print("Added user message to session")
 
-            # If image is provided, analyze it
+            # Process image if provided
             if image_data:
-                print("IMAGE DATA FOUND!!")
                 try:
-                    # Analyze the image
                     image_analysis = await analyze_image(image_data)
                     
                     # Add image analysis to conversation history
                     session["conversation_history"]["messages"].append({
-                        "role": "assistant",
-                        "content": image_analysis["chat_response"],
-                        "image_analysis": image_analysis["analysis"],
+                        "role": "system",
+                        "content": f"Image Analysis: {image_analysis}",
                         "timestamp": datetime.utcnow().isoformat()
                     })
                     
                     # Save session with updated history
                     save_session(session_id, session.get("user_id"), session, self.db)
                     
-                    return {
-                        "message": image_analysis["chat_response"],
-                        "analysis": image_analysis["analysis"]
-                    }
+                    return {"message": image_analysis}
                 except Exception as e:
                     logger.error(f"Error analyzing image: {str(e)}")
                     error_message = "I apologize, but I had trouble analyzing your image. Let's continue our conversation about your fragrance preferences."
@@ -188,12 +219,25 @@ class ChatService:
                     save_session(session_id, session.get("user_id"), session, self.db)
                     return {"message": error_message}
 
+            # Analyze chat messages to extract preferences
+            if session.get("user_id"):
+                print("\nCalling chat analysis service...")
+                print(f"User ID: {session['user_id']}")
+                print(f"Messages to analyze: {session['conversation_history']['messages']}")
+                await self.analysis_service.analyze_chat_messages(
+                    session["user_id"],
+                    session["conversation_history"]["messages"]
+                )
+                print("Chat analysis complete")
+            else:
+                print("\nNo user_id found in session, skipping analysis")
+
             # Process regular message
             # Truncate conversation history if needed
             session["conversation_history"]["messages"] = truncate_conversation_history(
                 session["conversation_history"]["messages"]
             )
-            
+
             response_generator = generate_response(session, message, self.db)
             full_response = ""
             async for chunk in response_generator:
@@ -208,6 +252,7 @@ class ChatService:
 
             # Save session with updated history
             save_session(session_id, session.get("user_id"), session, self.db)
+            print("Added assistant message to session")
 
             return {
                 "message": full_response,
@@ -215,5 +260,63 @@ class ChatService:
             }
 
         except Exception as e:
+            print(f"\nError in process_message: {str(e)}")
             logger.error(f"Error processing message: {str(e)}")
-            raise 
+            raise
+
+    async def get_or_create_chat_session(self, session_id: str) -> ChatSession:
+        # Implementation of get_or_create_chat_session method
+        pass
+
+    async def add_message_to_session(self, session_id: str, role: str, content: str) -> bool:
+        # Implementation of add_message_to_session method
+        pass
+
+    async def prepare_system_message(self, user_id: str) -> str:
+        # Implementation of prepare_system_message method
+        pass
+
+    async def get_openai_response(self, messages: List[Dict], system_message: str) -> str:
+        # Implementation of get_openai_response method
+        pass
+
+    async def process_message_stream(self, session_id: str, message: str, background_tasks: BackgroundTasks, image_data: Optional[str] = None) -> AsyncGenerator[str, None]:
+        """
+        Stream the assistant's response and run chat analysis in the background.
+        """
+        try:
+            session = get_session(session_id, self.db)
+            if not session:
+                yield "data: Error: Session not found\n\n"
+                return
+
+            # Add user message to history
+            session["conversation_history"]["messages"].append({
+                "role": "user",
+                "content": message,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+
+            # Start background analysis (do not await)
+            if session.get("user_id"):
+                background_tasks.add_task(
+                    self.analysis_service.analyze_chat_messages,
+                    session["user_id"],
+                    session["conversation_history"]["messages"]
+                )
+
+            # Truncate conversation history if needed
+            session["conversation_history"]["messages"] = truncate_conversation_history(
+                session["conversation_history"]["messages"]
+            )
+
+            # Stream the assistant's response
+            async for chunk in generate_response(session, message, self.db):
+                yield f"data: {chunk}\n\n"
+
+            # Optionally, add the assistant's response to history after streaming
+            # (You may want to collect the full response and save it here)
+
+        except Exception as e:
+            logger.error(f"Error streaming message: {str(e)}")
+            yield f"data: Error: {str(e)}\n\n" 

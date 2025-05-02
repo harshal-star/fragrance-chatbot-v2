@@ -18,9 +18,18 @@ class ProfileService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_user(self, user: UserCreate) -> Dict:
+    async def create_user(self, user: UserCreate) -> Dict:
         """Create a new user"""
         try:
+            # Check if user exists
+            existing_user = self.db.query(UserModel).filter(
+                UserModel.user_id == user.user_id
+            ).first()
+            
+            if existing_user:
+                return existing_user.to_dict()
+
+            # Create new user
             db_user = UserModel(
                 user_id=user.user_id,
                 created_at=datetime.utcnow(),
@@ -35,7 +44,7 @@ class ProfileService:
             self.db.rollback()
             raise
 
-    def get_user(self, user_id: str) -> Optional[Dict]:
+    async def get_user(self, user_id: str) -> Optional[Dict]:
         """Get user by ID"""
         try:
             user = self.db.query(UserModel).filter(UserModel.user_id == user_id).first()
@@ -97,21 +106,39 @@ class ProfileService:
             logger.error(f"Error getting user profile: {str(e)}")
             raise
 
-    async def create_scent_preferences(self, user_id: str, preferences: ScentPreferencesCreate) -> Dict:
+    async def create_scent_preferences(self, preferences: ScentPreferencesCreate) -> Dict:
         """Create scent preferences for a user"""
         try:
             # Check if user exists
-            user = self.db.query(UserModel).filter(UserModel.user_id == user_id).first()
+            user = self.db.query(UserModel).filter(UserModel.user_id == preferences.user_id).first()
             if not user:
                 raise ValueError("User not found")
 
-            # Create preferences
+            # Check if preferences already exist
+            existing_prefs = self.db.query(ScentPreferencesModel).filter(
+                ScentPreferencesModel.user_id == preferences.user_id
+            ).first()
+
+            if existing_prefs:
+                # Update existing preferences
+                existing_prefs.favorite_scents = list(set(existing_prefs.favorite_scents + preferences.favorite_scents))
+                existing_prefs.disliked_scents = list(set(existing_prefs.disliked_scents + preferences.disliked_scents))
+                existing_prefs.preferred_fragrance_families = list(set(existing_prefs.preferred_fragrance_families + preferences.preferred_fragrance_families))
+                existing_prefs.intensity_preference = preferences.intensity_preference
+                existing_prefs.updated_at = datetime.utcnow()
+                self.db.commit()
+                self.db.refresh(existing_prefs)
+                return existing_prefs.to_dict()
+
+            # Create new preferences
             scent_prefs = ScentPreferencesModel(
-                user_id=user_id,
+                user_id=preferences.user_id,
                 favorite_scents=preferences.favorite_scents,
                 disliked_scents=preferences.disliked_scents,
                 preferred_fragrance_families=preferences.preferred_fragrance_families,
-                intensity_preference=preferences.intensity_preference
+                intensity_preference=preferences.intensity_preference,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             
             self.db.add(scent_prefs)
@@ -124,10 +151,12 @@ class ProfileService:
             self.db.rollback()
             raise
 
-    def get_scent_preferences(self, user_id: str) -> Optional[Dict]:
+    async def get_scent_preferences(self, user_id: str) -> Optional[Dict]:
         """Get scent preferences by user ID"""
         try:
-            prefs = self.db.query(ScentPreferencesModel).filter(ScentPreferencesModel.user_id == user_id).first()
+            prefs = self.db.query(ScentPreferencesModel).filter(
+                ScentPreferencesModel.user_id == user_id
+            ).first()
             if not prefs:
                 return None
             return prefs.to_dict()
@@ -135,18 +164,35 @@ class ProfileService:
             logger.error(f"Error getting scent preferences: {str(e)}")
             raise
 
-    async def create_style_preferences(self, user_id: str, preferences: StylePreferencesCreate) -> Dict:
+    async def create_style_preferences(self, preferences: StylePreferencesCreate) -> Dict:
         """Create style preferences for a user"""
         try:
             # Check if user exists
-            user = self.db.query(UserModel).filter(UserModel.user_id == user_id).first()
+            user = self.db.query(UserModel).filter(UserModel.user_id == preferences.user_id).first()
             if not user:
                 raise ValueError("User not found")
 
-            # Create preferences
+            # Check if preferences already exist
+            existing_prefs = self.db.query(StylePreferencesModel).filter(
+                StylePreferencesModel.user_id == preferences.user_id
+            ).first()
+
+            if existing_prefs:
+                # Update existing preferences
+                existing_prefs.clothing_style = preferences.clothing_style
+                existing_prefs.all_styles = list(set(existing_prefs.all_styles + preferences.all_styles))
+                existing_prefs.updated_at = datetime.utcnow()
+                self.db.commit()
+                self.db.refresh(existing_prefs)
+                return existing_prefs.to_dict()
+
+            # Create new preferences
             style_prefs = StylePreferencesModel(
-                user_id=user_id,
-                style_type=preferences.style_type
+                user_id=preferences.user_id,
+                clothing_style=preferences.clothing_style,
+                all_styles=preferences.all_styles,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             
             self.db.add(style_prefs)
@@ -159,10 +205,12 @@ class ProfileService:
             self.db.rollback()
             raise
 
-    def get_style_preferences(self, user_id: str) -> Optional[Dict]:
+    async def get_style_preferences(self, user_id: str) -> Optional[Dict]:
         """Get style preferences by user ID"""
         try:
-            prefs = self.db.query(StylePreferencesModel).filter(StylePreferencesModel.user_id == user_id).first()
+            prefs = self.db.query(StylePreferencesModel).filter(
+                StylePreferencesModel.user_id == user_id
+            ).first()
             if not prefs:
                 return None
             return prefs.to_dict()
@@ -225,32 +273,31 @@ class ProfileService:
             self.db.rollback()
             raise
 
-    def update_scent_preferences(self, user_id: str, preferences_data: dict) -> Optional[Dict]:
+    async def update_scent_preferences(self, user_id: str, preferences_data: dict) -> Optional[Dict]:
         """Update scent preferences"""
         try:
-            prefs = self.db.query(ScentPreferencesModel).filter(ScentPreferencesModel.user_id == user_id).first()
+            prefs = self.db.query(ScentPreferencesModel).filter(
+                ScentPreferencesModel.user_id == user_id
+            ).first()
             if not prefs:
                 return None
 
-            # Merge liked_scents
+            # Merge preferences
             if 'favorite_scents' in preferences_data:
                 existing = set(prefs.favorite_scents or [])
                 new = set(preferences_data['favorite_scents'] or [])
                 prefs.favorite_scents = list(existing.union(new))
 
-            # Merge disliked_scents
             if 'disliked_scents' in preferences_data:
                 existing = set(prefs.disliked_scents or [])
                 new = set(preferences_data['disliked_scents'] or [])
                 prefs.disliked_scents = list(existing.union(new))
 
-            # Merge preferred_fragrance_families
             if 'preferred_fragrance_families' in preferences_data:
                 existing = set(prefs.preferred_fragrance_families or [])
                 new = set(preferences_data['preferred_fragrance_families'] or [])
                 prefs.preferred_fragrance_families = list(existing.union(new))
 
-            # Overwrite intensity_preference if provided
             if 'intensity_preference' in preferences_data:
                 prefs.intensity_preference = preferences_data['intensity_preference']
 
@@ -263,16 +310,23 @@ class ProfileService:
             self.db.rollback()
             raise
 
-    def update_style_preferences(self, user_id: str, preferences_data: dict) -> Optional[Dict]:
+    async def update_style_preferences(self, user_id: str, preferences_data: dict) -> Optional[Dict]:
         """Update style preferences"""
         try:
-            prefs = self.db.query(StylePreferencesModel).filter(StylePreferencesModel.user_id == user_id).first()
+            prefs = self.db.query(StylePreferencesModel).filter(
+                StylePreferencesModel.user_id == user_id
+            ).first()
             if not prefs:
                 return None
 
-            for key, value in preferences_data.items():
-                if hasattr(prefs, key):
-                    setattr(prefs, key, value)
+            # Update preferences
+            if 'clothing_style' in preferences_data:
+                prefs.clothing_style = preferences_data['clothing_style']
+
+            if 'all_styles' in preferences_data:
+                existing = set(prefs.all_styles or [])
+                new = set(preferences_data['all_styles'] or [])
+                prefs.all_styles = list(existing.union(new))
 
             prefs.updated_at = datetime.utcnow()
             self.db.commit()

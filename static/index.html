@@ -660,6 +660,24 @@
             }
         }
 
+        async function initializeChat() {
+            try {
+                // Check if this is the first time user is visiting
+                const isFirstVisit = !localStorage.getItem('hasVisited');
+                const data = await startSession();  // Get session data
+                sessionId = data.session_id;  // Store the session ID
+                
+                // Add the welcome message
+                addMessage(data.message, false);
+                
+                // Mark that user has visited
+                localStorage.setItem('hasVisited', 'true');
+            } catch (error) {
+                console.error('Error initializing chat:', error);
+                addMessage('Sorry, I encountered an error. Please try again.', false);
+            }
+        }
+
         async function startSession() {
             try {
                 const response = await fetch('/api/v1/start-session', {
@@ -673,11 +691,9 @@
                 });
                 const data = await response.json();
                 sessionId = data.session_id;
-                addMessage(data.message, false);
-                return data.message;
+                return data;  // Return the entire data object
             } catch (error) {
                 console.error('Error starting session:', error);
-                addMessage('Sorry, I encountered an error. Please try again.', false);
                 throw error;
             }
         }
@@ -763,21 +779,6 @@
             }
         }
 
-        // Initialize chat with a welcome message
-        async function initializeChat() {
-            try {
-                // Check if this is the first time user is visiting
-                const isFirstVisit = !localStorage.getItem('hasVisited');
-                await startSession();  // Don't add message here since startSession already does it
-                
-                // Mark that user has visited
-                localStorage.setItem('hasVisited', 'true');
-            } catch (error) {
-                console.error('Error initializing chat:', error);
-                addMessage('Sorry, I encountered an error. Please try again.', false);
-            }
-        }
-
         // Start chat when page loads
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('message-input').focus();
@@ -795,11 +796,11 @@
                 // Reset the session ID to force a new session
                 sessionId = null;
                 
-                // Start a new session with isNewChat flag
-                const welcomeMessage = await startSession();
+                // Start a new session
+                const data = await startSession();
                 
                 // Add the welcome message
-                addMessage(welcomeMessage, false);
+                addMessage(data.message, false);
                 
                 // Focus on the input field
                 document.getElementById('message-input').focus();
