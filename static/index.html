@@ -846,7 +846,7 @@
                     reader.readAsDataURL(file);
                 });
 
-                // Send image to server
+                // Send image to server and wait for full response
                 const response = await fetch(CHAT_URL, {
                     method: 'POST',
                     headers: {
@@ -863,32 +863,32 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                return response.json();
+                // Wait for the full response and display it at once
+                const data = await response.json();
+
+                const analysisSection = document.createElement('div');
+                analysisSection.className = 'image-analysis-section';
+
+                const header = document.createElement('div');
+                header.className = 'image-analysis-header';
+                header.textContent = `Analysis for image ${index + 1}:`;
+
+                const content = document.createElement('div');
+                content.innerHTML = formatMessage(data.message);
+
+                analysisSection.appendChild(header);
+                analysisSection.appendChild(content);
+                document.getElementById('chat-messages').appendChild(analysisSection);
+
+                return data;
             });
 
             try {
                 // Wait for all images to be processed
-                const responses = await Promise.all(imagePromises);
+                await Promise.all(imagePromises);
                 
                 // Remove loading message
                 loadingMessage.parentElement.remove();
-                
-                // Display responses in order
-                responses.forEach((data, index) => {
-                    const analysisSection = document.createElement('div');
-                    analysisSection.className = 'image-analysis-section';
-                    
-                    const header = document.createElement('div');
-                    header.className = 'image-analysis-header';
-                    header.textContent = `Analysis for image ${index + 1}:`;
-                    
-                    const content = document.createElement('div');
-                    content.innerHTML = formatMessage(data.message);
-                    
-                    analysisSection.appendChild(header);
-                    analysisSection.appendChild(content);
-                    document.getElementById('chat-messages').appendChild(analysisSection);
-                });
 
                 // Update status to "Seen" after a short delay
                 setTimeout(() => {

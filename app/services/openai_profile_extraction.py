@@ -98,20 +98,20 @@ class OpenAIProfileExtraction:
             
         # Clean scent preferences
         scent_prefs = data["scent_preferences"]
-        scent_prefs["favorite_scents"] = [s.lower().strip() for s in scent_prefs.get("favorite_scents", [])]
-        scent_prefs["disliked_scents"] = [s.lower().strip() for s in scent_prefs.get("disliked_scents", [])]
-        scent_prefs["preferred_fragrance_families"] = [f.lower().strip() for f in scent_prefs.get("preferred_fragrance_families", [])]
-        scent_prefs["intensity_preference"] = scent_prefs.get("intensity_preference", "medium").lower()
+        scent_prefs["favorite_scents"] = [(s or "").lower().strip() for s in scent_prefs.get("favorite_scents", [])]
+        scent_prefs["disliked_scents"] = [(s or "").lower().strip() for s in scent_prefs.get("disliked_scents", [])]
+        scent_prefs["preferred_fragrance_families"] = [(f or "").lower().strip() for f in scent_prefs.get("preferred_fragrance_families", [])]
+        scent_prefs["intensity_preference"] = (scent_prefs.get("intensity_preference") or "medium").lower()
         
         # Clean style preferences
         style_prefs = data["style_preferences"]
-        style_prefs["clothing_style"] = style_prefs.get("clothing_style", "").lower().strip() or None
-        style_prefs["all_styles"] = [s.lower().strip() for s in style_prefs.get("all_styles", [])]
+        style_prefs["clothing_style"] = (style_prefs.get("clothing_style") or "").lower().strip() or None
+        style_prefs["all_styles"] = [(s or "").lower().strip() for s in style_prefs.get("all_styles", [])]
         
         # Clean personality traits
         personality = data["personality_traits"]
-        personality["traits"] = [t.lower().strip() for t in personality.get("traits", [])]
-        personality["primary_trait"] = personality.get("primary_trait", "").lower().strip() or None
+        personality["traits"] = [(t or "").lower().strip() for t in personality.get("traits", [])]
+        personality["primary_trait"] = (personality.get("primary_trait") or "").lower().strip() or None
         personality["confidence_score"] = personality.get("confidence_score", {})
         
         return data

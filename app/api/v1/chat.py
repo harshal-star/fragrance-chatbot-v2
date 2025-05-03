@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from app.models.schemas import ChatRequest, ChatResponse, ImageUploadRequest
 from app.services.chat import ChatService
 from app.database import get_db
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 from app.core.config import settings
 from pydantic import BaseModel
 
@@ -17,6 +17,7 @@ class StartSessionRequest(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    image_data: Optional[str] = None  # base64 or URL, depending on frontend
 
 router = APIRouter(tags=["chat"])
 
@@ -32,12 +33,18 @@ async def start_session(request: StartSessionRequest, db: Session = Depends(get_
 
 @router.post("/chat")
 async def chat(request: ChatRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Process a chat message and stream the response."""
+    """Process a chat message and stream the response, or return JSON for image uploads."""
     try:
         chat_service = ChatService(db, settings)
+        # If image_data is present, use non-streaming
+        if request.image_data:
+            result = await chat_service.process_message(request.session_id, request.message, request.image_data)
+            print("Returning image analysis result:", result)
+            return JSONResponse(content=result)
+        # Otherwise, stream as usual
         return StreamingResponse(
             chat_service.process_message_stream(
-                request.session_id, request.message, background_tasks
+                request.session_id, request.message, background_tasks, request.image_data
             ),
             media_type="text/event-stream"
         )

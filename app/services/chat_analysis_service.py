@@ -21,52 +21,18 @@ class ChatAnalysisService:
             "personality", "trait", "character", "nature"
         ]
 
-    async def analyze_chat_messages(self, user_id: str, messages: List[Dict[str, str]]) -> None:
-        """
-        Analyze chat messages to extract user preferences and personality traits
-        """
+    async def analyze_chat_messages(self, user_id: str, messages: List[Dict]) -> None:
+        """Analyze chat messages to extract user profile information"""
         try:
-            # Get only user messages
-            user_messages = [msg for msg in messages if msg["role"] == "user"]
-            print(f"\nFound {len(user_messages)} user messages")
-            
-            # Add to buffer
-            self.message_buffer.extend(user_messages)
-            
-            # Debug: Print buffer state
-            print("\n=== Message Buffer ===")
-            print(f"Buffer size: {len(self.message_buffer)}")
-            print("Messages in buffer:")
-            for msg in self.message_buffer:
-                print(f"- {msg['content']}")
-            
-            # Check if we should extract
-            should_extract = self._should_extract_profile()
-            print(f"\nShould extract: {should_extract}")
-            
-            if should_extract:
-                # Combine messages for context
-                combined_message = " ".join([msg["content"] for msg in self.message_buffer])
-                print(f"\nCombined message: {combined_message}")
-                
-                # Extract using OpenAI
-                print("\nCalling OpenAI extraction...")
-                extracted_data = await self.openai_extraction.extract_profile_data(combined_message)
-                print("\n=== Extracted Data ===")
-                print(json.dumps(extracted_data, indent=2))
-                
-                if extracted_data:
-                    # Process and save the data
-                    await self._process_extracted_data(user_id, extracted_data)
-                else:
-                    print("\nNo data extracted from OpenAI")
-                
-                # Clear buffer
-                self.message_buffer = []
-                print("\nBuffer cleared")
-
+            logger.info(f"Structured extraction input for user {user_id}: {messages}")
+            # Combine all user messages into a single string
+            combined_message = " ".join([msg["content"] for msg in messages if msg["role"] in ["user", "system"]])
+            logger.info(f"Combined message for extraction: {combined_message}")
+            logger.info("Calling OpenAI extraction...")
+            extracted_data = await self.openai_extraction.extract_profile_data(combined_message)
+            logger.info(f"Structured extraction result for user {user_id}: {extracted_data}")
+            await self._process_extracted_data(user_id, extracted_data)
         except Exception as e:
-            print(f"\nError in analyze_chat_messages: {str(e)}")
             logger.error(f"Error analyzing chat messages: {str(e)}")
             raise
 
@@ -93,6 +59,7 @@ class ChatAnalysisService:
         Process and save extracted profile data
         """
         try:
+            logger.info(f"Processing extracted data for user {user_id}: {extracted_data}")
             # Process scent preferences
             if extracted_data["scent_preferences"]:
                 scent_prefs = extracted_data["scent_preferences"]
@@ -104,6 +71,7 @@ class ChatAnalysisService:
                     intensity_preference=scent_prefs["intensity_preference"]
                 )
                 await self.profile_service.create_scent_preferences(scent_prefs_create)
+                logger.info(f"Saved scent preferences for user {user_id}: {scent_prefs_create}")
             
             # Process style preferences
             if extracted_data["style_preferences"]:
@@ -114,6 +82,7 @@ class ChatAnalysisService:
                     all_styles=style_prefs["all_styles"]
                 )
                 await self.profile_service.create_style_preferences(style_prefs_create)
+                logger.info(f"Saved style preferences for user {user_id}: {style_prefs_create}")
             
             # Process personality traits
             if extracted_data["personality_traits"]:
@@ -125,6 +94,7 @@ class ChatAnalysisService:
                     confidence_score=personality["confidence_score"]
                 )
                 await self.profile_service.create_personality_traits(user_id, traits_create)
+                logger.info(f"Saved personality traits for user {user_id}: {traits_create}")
 
         except Exception as e:
             logger.error(f"Error processing extracted data: {str(e)}")

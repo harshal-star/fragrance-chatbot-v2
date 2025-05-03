@@ -83,7 +83,7 @@ def estimate_tokens(text: str) -> int:
         # Fallback: roughly estimate 1 token per 4 characters
         return len(text) // 4
 
-def truncate_conversation_history(history: List[Dict], max_tokens: int = 4000) -> List[Dict]:
+def truncate_conversation_history(history: List[Dict], max_tokens: int = 6000) -> List[Dict]:
     """
     Truncate conversation history to stay within token limit.
     Keeps the most recent messages while staying under the token limit.

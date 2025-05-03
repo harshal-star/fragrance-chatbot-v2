@@ -193,33 +193,45 @@ class ChatService:
             # Process image if provided
             if image_data:
                 try:
+                    logger.info(f"Starting image analysis for session {session_id}")
                     image_analysis = await analyze_image(image_data)
-                    
-                    # Add image analysis to conversation history
+                    logger.info(f"Image analysis output: {image_analysis!r}")
+                    analysis_content = f"Image Analysis: {image_analysis}"
                     session["conversation_history"]["messages"].append({
                         "role": "system",
-                        "content": f"Image Analysis: {image_analysis}",
+                        "content": analysis_content,
                         "timestamp": datetime.utcnow().isoformat()
                     })
-                    
+                    logger.info(f"Added image analysis to conversation history for session {session_id}")
+                    # Run OpenAI structured extraction on the image analysis output if present and non-empty
+                    if session.get("user_id") and image_analysis:
+                        try:
+                            logger.info(f"Running structured extraction on image analysis for session {session_id}: {analysis_content!r}")
+                            await self.analysis_service.analyze_chat_messages(
+                                session["user_id"],
+                                [{"role": "system", "content": analysis_content}]
+                            )
+                            logger.info(f"Structured extraction on image analysis completed for session {session_id}")
+                        except Exception as e:
+                            logger.error(f"Error extracting profile data from image analysis for session {session_id}: {str(e)}")
                     # Save session with updated history
                     save_session(session_id, session.get("user_id"), session, self.db)
-                    
-                    return {"message": image_analysis}
+                    logger.info(f"Session saved after image analysis for session {session_id}")
+                    response_text = image_analysis.get('chat_response') or image_analysis.get('analysis') or str(image_analysis)
+                    return {"message": response_text}
                 except Exception as e:
-                    logger.error(f"Error analyzing image: {str(e)}")
+                    logger.error(f"Error analyzing image for session {session_id}: {str(e)}")
                     error_message = "I apologize, but I had trouble analyzing your image. Let's continue our conversation about your fragrance preferences."
                     session["conversation_history"]["messages"].append({
                         "role": "assistant",
                         "content": error_message,
                         "timestamp": datetime.utcnow().isoformat()
                     })
-                    
-                    # Save session with updated history
                     save_session(session_id, session.get("user_id"), session, self.db)
+                    logger.info(f"Session saved after image analysis error for session {session_id}")
                     return {"message": error_message}
 
-            # Analyze chat messages to extract preferences
+            # Analyze chat messages to extract preferences (for text messages)
             if session.get("user_id"):
                 print("\nCalling chat analysis service...")
                 print(f"User ID: {session['user_id']}")
@@ -264,59 +276,41 @@ class ChatService:
             logger.error(f"Error processing message: {str(e)}")
             raise
 
-    async def get_or_create_chat_session(self, session_id: str) -> ChatSession:
-        # Implementation of get_or_create_chat_session method
-        pass
-
-    async def add_message_to_session(self, session_id: str, role: str, content: str) -> bool:
-        # Implementation of add_message_to_session method
-        pass
-
-    async def prepare_system_message(self, user_id: str) -> str:
-        # Implementation of prepare_system_message method
-        pass
-
-    async def get_openai_response(self, messages: List[Dict], system_message: str) -> str:
-        # Implementation of get_openai_response method
-        pass
-
-    async def process_message_stream(self, session_id: str, message: str, background_tasks: BackgroundTasks, image_data: Optional[str] = None) -> AsyncGenerator[str, None]:
+    async def process_message_stream(
+        self,
+        session_id: str,
+        message: str,
+        background_tasks: BackgroundTasks,
+        image_data: str = None
+    ) -> AsyncGenerator[str, None]:
         """
-        Stream the assistant's response and run chat analysis in the background.
+        Stream the assistant's response for text chat.
         """
-        try:
-            session = get_session(session_id, self.db)
-            if not session:
-                yield "data: Error: Session not found\n\n"
-                return
+        session = get_session(session_id, self.db)
+        if not session:
+            yield "data: Error: Session not found\n\n"
+            return
 
-            # Add user message to history
-            session["conversation_history"]["messages"].append({
-                "role": "user",
-                "content": message,
-                "timestamp": datetime.utcnow().isoformat()
-            })
+        # Add user message to history
+        session["conversation_history"]["messages"].append({
+            "role": "user",
+            "content": message,
+            "timestamp": datetime.utcnow().isoformat()
+        })
 
-            # Start background analysis (do not await)
-            if session.get("user_id"):
-                background_tasks.add_task(
-                    self.analysis_service.analyze_chat_messages,
-                    session["user_id"],
-                    session["conversation_history"]["messages"]
-                )
-
-            # Truncate conversation history if needed
-            session["conversation_history"]["messages"] = truncate_conversation_history(
+        # Start background analysis (do not await)
+        if session.get("user_id"):
+            background_tasks.add_task(
+                self.analysis_service.analyze_chat_messages,
+                session["user_id"],
                 session["conversation_history"]["messages"]
             )
 
-            # Stream the assistant's response
-            async for chunk in generate_response(session, message, self.db):
-                yield f"data: {chunk}\n\n"
+        # Truncate conversation history if needed
+        session["conversation_history"]["messages"] = truncate_conversation_history(
+            session["conversation_history"]["messages"]
+        )
 
-            # Optionally, add the assistant's response to history after streaming
-            # (You may want to collect the full response and save it here)
-
-        except Exception as e:
-            logger.error(f"Error streaming message: {str(e)}")
-            yield f"data: Error: {str(e)}\n\n" 
+        # Stream the assistant's response
+        async for chunk in generate_response(session, message, self.db):
+            yield f"data: {chunk}\n\n" 
