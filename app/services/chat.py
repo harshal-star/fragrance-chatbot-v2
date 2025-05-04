@@ -67,13 +67,10 @@ class ChatService:
             else:
                 print("No user_id provided")
             
-            session = get_session_by_user(user_id, self.db)
-            if not session:
-                print("Creating new session...")
-                session = create_session(user_id, self.db)
-                print(f"New session created: {session}")
-            else:
-                print(f"Existing session found: {session}")
+            # Always create a new session for the user
+            print("Creating new session...")
+            session = create_session(user_id, self.db)
+            print(f"New session created: {session}")
             
             initial_message = "Hey there! I'm Lila, your personal fragrance consultant. I'd love to help you create a fragrance that perfectly matches your style. Would you like to start by telling me a bit about yourself or sharing a photo of yourself?"
             

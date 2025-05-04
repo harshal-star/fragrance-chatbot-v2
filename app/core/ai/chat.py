@@ -98,38 +98,3 @@ async def generate_response(session: Dict, message: str, db: Session) -> AsyncGe
     except Exception as e:
         logger.error(f"Error generating response: {str(e)}", exc_info=True)
         yield "I apologize, but I'm having trouble processing your request right now. Could you please try again?"
-
-async def process_chat_message(
-    message: str,
-    conversation_history: List[Dict],
-    user_id: str,
-    session_id: str,
-    db: Session
-) -> Dict:
-    """
-    Process a chat message and generate a response
-    """
-    try:
-        # Add user message to conversation history
-        conversation_history.append({
-            "role": "user",
-            "content": message
-        })
-
-        # TODO: Implement actual AI response generation
-        # For now, return a simple response
-        response = {
-            "role": "assistant",
-            "content": "I'm your fragrance assistant. How can I help you today?"
-        }
-
-        # Add assistant response to conversation history
-        conversation_history.append(response)
-
-        # Save updated conversation history
-        save_session(session_id, user_id, {"conversation_history": {"messages": conversation_history}}, db)
-
-        return response
-    except Exception as e:
-        logger.error(f"Error processing chat message: {str(e)}")
-        raise 

@@ -54,6 +54,9 @@ async def startup_event():
     db = next(get_db())
     try:
         init_db(db)
+        # Start session cleanup task
+        asyncio.create_task(run_cleanup_task(db))
+        logger.info("Session cleanup task started")
     finally:
         db.close()
 
