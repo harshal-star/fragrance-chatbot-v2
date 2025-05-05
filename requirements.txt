@@ -26,7 +26,6 @@ burr==0.22.1
 cachetools==5.5.0
 certifi==2024.7.4
 cffi==1.17.0
-chainlit==1.1.402
 chardet==5.2.0
 charset-normalizer==3.3.2
 chevron==0.14.0
