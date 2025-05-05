@@ -34,6 +34,23 @@ logging.basicConfig(
     ]
 )
 
+def is_duplicate_user_message(messages, content, window_seconds=2):
+    now = datetime.utcnow()
+    for msg in reversed(messages):
+        if msg["role"] == "user" and msg["content"] == content:
+            try:
+                msg_time = datetime.fromisoformat(msg["timestamp"])
+            except Exception:
+                continue
+            if abs((now - msg_time).total_seconds()) < window_seconds:
+                return True
+            else:
+                return False  # Found same content, but outside window
+    return False
+
+def message_id_exists(messages, message_id):
+    return any(msg.get("message_id") == message_id for msg in messages if message_id)
+
 class ChatService:
     def __init__(self, db: Session, config: Settings):
         self.config = config
@@ -125,12 +142,17 @@ class ChatService:
             if not session.get("conversation_history"):
                 session["conversation_history"] = {"messages": []}
 
-            # Add the new message with timestamp
-            session["conversation_history"]["messages"].append({
-                "role": message["role"],
-                "content": message["content"],
-                "timestamp": datetime.utcnow().isoformat()
-            })
+            # Use message_id for deduplication
+            message_id = message.get("message_id")
+            if not message_id or not message_id_exists(session["conversation_history"]["messages"], message_id):
+                session["conversation_history"]["messages"].append({
+                    "role": message["role"],
+                    "content": message["content"],
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "message_id": message_id
+                })
+            else:
+                print("Duplicate user message prevented by message_id.")
 
             # Save the updated session
             save_session(
@@ -167,7 +189,7 @@ class ChatService:
             logger.error(f"Error getting user chat: {str(e)}")
             raise
 
-    async def process_message(self, session_id: str, message: str, image_data: Optional[str] = None) -> Dict:
+    async def process_message(self, session_id: str, message: str, image_data: Optional[str] = None, message_id: Optional[str] = None) -> Dict:
         """Process a chat message and optionally an image."""
         try:
             print("\n=== Chat Processing ===")
@@ -179,12 +201,16 @@ class ChatService:
                 raise ValueError("Session not found")
             print(f"Session found: {session}")
 
-            # Add user message to history
-            session["conversation_history"]["messages"].append({
-                "role": "user",
-                "content": message,
-                "timestamp": datetime.utcnow().isoformat()
-            })
+            # Add user message to history only if message_id is not a duplicate
+            if not message_id or not message_id_exists(session["conversation_history"]["messages"], message_id):
+                session["conversation_history"]["messages"].append({
+                    "role": "user",
+                    "content": message,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "message_id": message_id
+                })
+            else:
+                print("Duplicate user message prevented by message_id.")
             print("Added user message to session")
 
             # Process image if provided
@@ -278,7 +304,8 @@ class ChatService:
         session_id: str,
         message: str,
         background_tasks: BackgroundTasks,
-        image_data: str = None
+        image_data: str = None,
+        message_id: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
         Stream the assistant's response for text chat.
@@ -288,12 +315,16 @@ class ChatService:
             yield "data: Error: Session not found\n\n"
             return
 
-        # Add user message to history
-        session["conversation_history"]["messages"].append({
-            "role": "user",
-            "content": message,
-            "timestamp": datetime.utcnow().isoformat()
-        })
+        # Add user message to history only if message_id is not a duplicate
+        if not message_id or not message_id_exists(session["conversation_history"]["messages"], message_id):
+            session["conversation_history"]["messages"].append({
+                "role": "user",
+                "content": message,
+                "timestamp": datetime.utcnow().isoformat(),
+                "message_id": message_id
+            })
+        else:
+            print("Duplicate user message prevented by message_id.")
 
         # Start background analysis (do not await)
         if session.get("user_id"):
