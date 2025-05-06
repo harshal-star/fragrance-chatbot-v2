@@ -106,7 +106,8 @@ async def list_sessions(user_id: str, db: Session = Depends(get_db)):
 
 @router.post("/create-tables")
 def create_tables():
-    from app.models.models import Base
+    # Explicitly import all models so their tables are registered
+    from app.models.models import Base, User, Session
     from app.core.database import engine
     Base.metadata.create_all(bind=engine)
     return {"status": "tables created"} 
