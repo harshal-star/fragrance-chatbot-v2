@@ -1,13 +1,21 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import timedelta
+import os
 
 class Settings(BaseModel):
     # OpenAI API settings
     OPENAI_API_KEY: Optional[str] = None
     
     # Database settings
-    DATABASE_URL: str = "sqlite:///./fragrance_chatbot.db"
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:///./fragrance_chatbot.db"
+    )
+    
+    # If using PostgreSQL on Render, convert the URL format
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
     # Application settings
     DEBUG: bool = False
