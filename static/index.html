@@ -899,7 +899,7 @@
 
         async function startSession() {
             try {
-                const response = await fetch('/api/v1/start-session', {
+                const response = await fetch(START_SESSION_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1191,7 +1191,7 @@
         }
 
         async function loadSessionList() {
-            const response = await fetch(`/api/v1/sessions/${userId}`);
+            const response = await fetch(`${API_BASE_URL}/sessions/${userId}`);
             const sessions = await response.json();
             const sessionListDiv = document.getElementById('session-list');
             sessionListDiv.innerHTML = '';
@@ -1214,7 +1214,7 @@
         }
 
         async function loadChatHistory(sid) {
-            const response = await fetch(`/api/v1/history/${sid}`);
+            const response = await fetch(`${API_BASE_URL}/history/${sid}`);
             const data = await response.json();
             document.getElementById('chat-messages').innerHTML = '';
             console.log('Loaded chat history:', data.messages); // Debug: log all messages
