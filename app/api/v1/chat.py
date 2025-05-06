@@ -27,10 +27,13 @@ router = APIRouter(tags=["chat"])
 async def start_session(request: StartSessionRequest, db: Session = Depends(get_db)):
     """Start a new chat session."""
     try:
+        logger.info(f"/start-session called with user_id: {request.user_id}")
         chat_service = ChatService(db, settings)
-        return await chat_service.start_chat(request.user_id)
+        result = await chat_service.start_chat(request.user_id)
+        logger.info(f"/start-session result: {result}")
+        return result
     except Exception as e:
-        logger.error(f"Error starting session: {str(e)}")
+        logger.error(f"Error starting session: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat")
