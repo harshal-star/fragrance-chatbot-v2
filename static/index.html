@@ -62,15 +62,16 @@
         }
 
         .chat-header-bar {
+            min-height: 64px;
             display: flex;
             align-items: center;
-            justify-content: center;
             background: linear-gradient(90deg, #8E24AA 60%, #7B1FA2 100%);
-            padding: 0.75em 1.5em 0.75em 0.75em;
-            border-top-left-radius: 0.75em;
-            border-top-right-radius: 0.75em;
-            min-height: 0;
+            border-bottom: 1px solid #444;
+            box-sizing: border-box;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
             position: relative;
+            padding: 0 1.5em;
         }
 
         .header-toggle-btn {
@@ -336,16 +337,10 @@
         }
 
         .typing-indicator {
-            background-color: var(--background-light);
-            padding: 0.75rem 1.5rem;
-            border-radius: var(--border-radius);
-            display: none;
-            width: fit-content;
-            margin: 0.5rem 0;
-            box-shadow: 0 2px 8px var(--shadow-color);
+            display: none !important;
         }
 
-        .dot {
+        .streaming-content .dot {
             display: inline-block;
             width: 8px;
             height: 8px;
@@ -356,8 +351,8 @@
             opacity: 0.6;
         }
 
-        .dot:nth-child(2) { animation-delay: -1.1s; }
-        .dot:nth-child(3) { animation-delay: -0.9s; }
+        .streaming-content .dot:nth-child(2) { animation-delay: -1.1s; }
+        .streaming-content .dot:nth-child(3) { animation-delay: -0.9s; }
 
         @keyframes wave {
             0%, 60%, 100% { transform: translateY(0); }
@@ -433,10 +428,6 @@
 
             #message-input:focus {
                 border-color: var(--primary-main);
-                background-color: #2A2A2A;
-            }
-
-            .typing-indicator {
                 background-color: #2A2A2A;
             }
 
@@ -554,6 +545,8 @@
             color: #FFD700;
         }
         .sidebar-header {
+            background: none;
+            border-bottom: none;
             font-weight: bold;
             padding: 1rem;
             border-bottom: 1px solid #444;
@@ -565,6 +558,7 @@
         #session-list {
             flex: 1;
             overflow-y: auto;
+            margin-top: 16px;
         }
         .session-item {
             display: flex;
@@ -691,11 +685,6 @@
                 </div>
             </div>
             <div class="chat-messages" id="chat-messages"></div>
-            <div class="typing-indicator" id="typing-indicator">
-                <span class="dot"></span>
-                <span class="dot"></span>
-                <span class="dot"></span>
-            </div>
             <div class="input-container">
                 <input type="text" id="message-input" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
                 <input type="file" id="image-upload" accept="image/*" multiple style="display: none;" onchange="handleImageUpload(event)">
@@ -814,16 +803,14 @@
         function startStreamingResponse() {
             const chatMessages = document.getElementById('chat-messages');
             const { messageDiv, contentDiv } = createMessageElement(false);
-            
             contentDiv.className += ' streaming-content';
-            contentDiv.innerHTML = '<span class="streaming-cursor">|</span>';
-            
+            // Add animated dots for typing indicator
+            contentDiv.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTo({
                 top: chatMessages.scrollHeight,
                 behavior: 'smooth'
             });
-            
             currentStreamingMessage = contentDiv;
             return contentDiv;
         }
@@ -831,8 +818,12 @@
         function updateStreamingResponse(text) {
             if (currentStreamingMessage) {
                 const formattedText = formatMessage(text);
-                currentStreamingMessage.innerHTML = formattedText + '<span class="streaming-cursor">|</span>';
-                
+                // Show dots only if text is empty (still waiting for response)
+                if (formattedText) {
+                    currentStreamingMessage.innerHTML = formattedText + '<span class="streaming-cursor">|</span>';
+                } else {
+                    currentStreamingMessage.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+                }
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.scrollTo({
                     top: chatMessages.scrollHeight,
@@ -852,15 +843,11 @@
         }
 
         function showTypingIndicator() {
-            const indicator = document.getElementById('typing-indicator');
-            indicator.style.display = 'block';
-            isTyping = true;
+            /* No-op: handled by streaming response now */
         }
 
         function hideTypingIndicator() {
-            const indicator = document.getElementById('typing-indicator');
-            indicator.style.display = 'none';
-            isTyping = false;
+            /* No-op: handled by streaming response now */
         }
 
         let lastTypingUpdate = 0;
