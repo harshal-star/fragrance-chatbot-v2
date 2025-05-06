@@ -23,6 +23,8 @@ from app.core.config import settings
 from app.core.database import engine, Base, init_db, get_db
 from app.core.utils import logger
 from sqlalchemy.orm import Session
+# Import all models so their tables are registered with SQLAlchemy
+from app.models.models import User, Session  # Add any other models you have
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
