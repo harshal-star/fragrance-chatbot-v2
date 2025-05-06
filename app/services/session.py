@@ -5,7 +5,7 @@ from typing import Optional, Dict
 from sqlalchemy.orm import Session
 from app.models.models import Session
 from app.core.utils import logger
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 
 # Session configuration
 SESSION_TIMEOUT = timedelta(hours=24)  # Sessions expire after 24 hours
@@ -81,12 +81,9 @@ def save_session(session_id: str, user_id: Optional[str], session_data: Dict, db
         logger.error(f"Error saving session: {str(e)}")
         raise
 
-def table_exists(db, table_name):
-    result = db.execute(
-        text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name"),
-        {"table_name": table_name}
-    ).fetchone()
-    return result is not None
+def table_exists(db: Session, table_name: str) -> bool:
+    inspector = inspect(db.bind)
+    return table_name in inspector.get_table_names()
 
 def cleanup_expired_sessions(db: Session) -> None:
     """Clean up expired sessions."""

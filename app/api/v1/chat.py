@@ -9,6 +9,7 @@ from typing import List, Dict, Optional
 from app.core.config import settings
 from pydantic import BaseModel
 import os
+from sqlalchemy.sql import text
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +62,27 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks, db: Sess
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy"}
+async def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint that verifies database connection and tables"""
+    try:
+        # Try to create tables if they don't exist
+        from app.models.models import Base
+        Base.metadata.create_all(bind=db.bind)
+        
+        # Try a simple query to verify connection
+        db.execute(text("SELECT 1"))
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "tables": "created"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
 
 @router.get("/history/{session_id}")
 async def get_history(session_id: str, db: Session = Depends(get_db)):

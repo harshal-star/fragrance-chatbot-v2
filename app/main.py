@@ -26,9 +26,6 @@ from sqlalchemy.orm import Session
 # Import all models so their tables are registered with SQLAlchemy
 from app.models.models import User, Session  # Add any other models you have
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description=settings.PROJECT_DESCRIPTION,
@@ -53,15 +50,21 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # Initialize database
 @app.on_event("startup")
 async def startup_event():
-    # Ensure all tables are created before anything else
-    init_db()  # No arguments needed
-    db = next(get_db())
     try:
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+        
         # Start session cleanup task
-        asyncio.create_task(run_cleanup_task(db))
-        logger.info("Session cleanup task started")
-    finally:
-        db.close()
+        db = next(get_db())
+        try:
+            asyncio.create_task(run_cleanup_task(db))
+            logger.info("Session cleanup task started")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error during startup: {str(e)}")
+        raise
 
 # Include routers
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
