@@ -36,6 +36,10 @@ async def generate_response(session: Dict, message: str, db: Session) -> AsyncGe
         messages = [
             {"role": "system", "content": get_system_prompt()}
         ] + format_conversation_history(session["conversation_history"])
+
+        print(30 * "------------")
+        print(messages)
+        print(30 * "------------")
         
         # Call OpenAI API with streaming
         stream = client.chat.completions.create(

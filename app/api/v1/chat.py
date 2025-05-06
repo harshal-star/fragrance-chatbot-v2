@@ -36,6 +36,9 @@ async def start_session(request: StartSessionRequest, db: Session = Depends(get_
 @router.post("/chat")
 async def chat(request: ChatRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Process a chat message and stream the response, or return JSON for image uploads."""
+    print(30 * "------------")
+    print("WE ARE IN CHAT ENDPOINT!!")
+    print(30 * "------------")
     try:
         chat_service = ChatService(db, settings)
         # If image_data is present, use non-streaming

@@ -339,6 +339,12 @@ class ChatService:
             session["conversation_history"]["messages"]
         )
 
-        # Stream the assistant's response
-        async for chunk in generate_response(session, message, self.db):
-            yield f"data: {chunk}\n\n" 
+        # Debug yield: always yield something at the start
+        # yield "data: [DEBUG] Streaming started...\n\n"
+        try:
+            # Stream the assistant's response
+            async for chunk in generate_response(session, message, self.db):
+                yield f"data: {chunk}\n\n"
+        except Exception as e:
+            logger.error(f"Error in process_message_stream: {str(e)}")
+            yield f"data: Error: {str(e)}\n\n" 
