@@ -51,9 +51,10 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # Initialize database
 @app.on_event("startup")
 async def startup_event():
+    # Ensure all tables are created before anything else
+    init_db()  # No arguments needed
     db = next(get_db())
     try:
-        init_db(db)
         # Start session cleanup task
         asyncio.create_task(run_cleanup_task(db))
         logger.info("Session cleanup task started")
