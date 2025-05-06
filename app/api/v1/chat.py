@@ -15,12 +15,6 @@ logger = logging.getLogger(__name__)
 class StartSessionRequest(BaseModel):
     user_id: str
 
-class ChatRequest(BaseModel):
-    session_id: str
-    message: str
-    message_id: Optional[str] = None
-    image_data: Optional[str] = None  # base64 or URL, depending on frontend
-
 router = APIRouter(tags=["chat"])
 
 @router.post("/start-session", response_model=Dict)
