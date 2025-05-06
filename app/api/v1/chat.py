@@ -102,4 +102,11 @@ async def list_sessions(user_id: str, db: Session = Depends(get_db)):
             "updated_at": s.updated_at.isoformat() if s.updated_at else None,
             "preview": preview
         })
-    return session_list 
+    return session_list
+
+@router.post("/create-tables")
+def create_tables():
+    from app.models.models import Base
+    from app.core.database import engine
+    Base.metadata.create_all(bind=engine)
+    return {"status": "tables created"} 
