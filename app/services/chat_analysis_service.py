@@ -34,7 +34,7 @@ class ChatAnalysisService:
             await self._process_extracted_data(user_id, extracted_data)
         except Exception as e:
             logger.error(f"Error analyzing chat messages: {str(e)}")
-            raise
+            # Do not raise, just log
 
     def _should_extract_profile(self) -> bool:
         """Determine if we should extract profile information"""

@@ -42,11 +42,14 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks, db: Sess
     print(30 * "------------")
     try:
         chat_service = ChatService(db, settings)
-        # If image_data is present, use non-streaming
+        # If image_data is present, use streaming
         if request.image_data:
-            result = await chat_service.process_message(request.session_id, request.message, request.image_data, request.message_id)
-            print("Returning image analysis result:", result)
-            return JSONResponse(content=result)
+            return StreamingResponse(
+                chat_service.process_image_stream(
+                    request.session_id, request.image_data, request.message, request.message_id
+                ),
+                media_type="text/event-stream"
+            )
         # Otherwise, stream as usual
         return StreamingResponse(
             chat_service.process_message_stream(

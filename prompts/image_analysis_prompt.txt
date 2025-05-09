@@ -1,0 +1,11 @@
+# Image analysis prompts
+IMAGE_EXTRACTION_PROMPT = """
+Analyze this image of a person and provide insights about their:
+1. Style and fashion preferences
+2. Personality traits (based on appearance and style)
+3. Color preferences
+4. Overall aesthetic
+
+You have to extract all the details present in the image and provide a detailed analysis of the image.
+Once you provide the analysis of the image, ask a relevant followup question to the user either based on the image or based on the user's profile.
+"""

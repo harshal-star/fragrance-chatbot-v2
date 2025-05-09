@@ -27,6 +27,7 @@ from fastapi import BackgroundTasks
 import openai
 import os
 from openai import AsyncOpenAI
+from app.core.utils import get_image_analysis_prompt
 
 # Configure logging with UTF-8 encoding
 logging.basicConfig(
@@ -394,3 +395,61 @@ class ChatService:
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content 
+
+    async def process_image_stream(self, session_id, image_data, message, message_id):
+        """
+        Stream the assistant's response for image analysis.
+        """
+        session = get_session(session_id, self.db)
+        if not session:
+            yield "data: Error: Session not found\n\n"
+            return
+
+        # Add user message to history only if message_id is not a duplicate
+        if not message_id or not message_id_exists(session["conversation_history"]["messages"], message_id):
+            session["conversation_history"]["messages"].append({
+                "role": "user",
+                "content": message,
+                "timestamp": datetime.utcnow().isoformat(),
+                "message_id": message_id
+            })
+
+        # Call OpenAI with stream=True for image analysis
+        try:
+            # Compose the OpenAI message for image analysis
+            messages = [
+                {"role": "user", "content": message},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text",
+                        "text": get_image_analysis_prompt(),},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                    ]
+                }
+            ]
+            stream = await self.client.chat.completions.create(
+                model="gpt-4o-2024-08-06",
+                messages=messages,
+                stream=True,
+                max_tokens=1000,
+                temperature=0.7
+            )
+            analysis_text = ""
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    print("Streaming chunk:", content, flush=True)
+                    analysis_text += content
+                    yield f"data: {content}\n\n"
+                    yield f": keep-alive\n\n"
+            # Save the analysis to the session history
+            session["conversation_history"]["messages"].append({
+                "role": "assistant",
+                "content": analysis_text,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            save_session(session_id, session.get("user_id"), session, self.db)
+        except Exception as e:
+            logger.error(f"Error in process_image_stream: {str(e)}")
+            yield f"data: Error: {str(e)}\n\n" 

@@ -17,6 +17,10 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 with open("prompts/system_prompt.txt", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
+# Read image analysis prompt from file
+with open("prompts/image_analysis_prompt.txt", "r", encoding="utf-8") as f:
+    IMAGE_EXTRACTION_PROMPT = f.read()
+
 # Configure logging
 def setup_logging():
     """Configure logging with both file and console handlers"""
@@ -62,6 +66,10 @@ logger = setup_logging()
 def get_system_prompt() -> str:
     """Get the system prompt for the chatbot"""
     return SYSTEM_PROMPT
+
+def get_image_analysis_prompt() -> str:
+    """Get the image analysis prompt for the chatbot"""
+    return IMAGE_EXTRACTION_PROMPT
 
 def format_conversation_history(history: dict) -> list:
     """Format conversation history for OpenAI API"""

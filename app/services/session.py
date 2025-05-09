@@ -3,7 +3,7 @@ import uuid
 import asyncio
 from typing import Optional, Dict
 from sqlalchemy.orm import Session
-from app.models.models import Session
+from app.models.models import Session, User
 from app.core.utils import logger
 from sqlalchemy import text, inspect
 
@@ -16,10 +16,16 @@ def generate_session_id() -> str:
     return str(uuid.uuid4())
 
 def create_session(user_id: Optional[str] = None, db: Session = None) -> Dict:
-    """Create a new chat session for a user."""
+    """Create a new chat session for a user, and ensure the user exists."""
     try:
-        session_id = generate_session_id()
-        now = datetime.utcnow()
+        # Ensure user exists
+        if user_id:
+            user = db.query(User).filter(User.user_id == user_id).first()
+            if not user:
+                user = User(user_id=user_id)
+                db.add(user)
+                db.commit()
+        session_id = generate_session_id(); now = datetime.utcnow()
         session = Session(
             session_id=session_id,
             user_id=user_id,
