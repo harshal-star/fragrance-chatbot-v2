@@ -14,7 +14,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Read system prompt from file
-with open("prompts/system_prompt.txt", "r") as f:
+with open("prompts/system_prompt.txt", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
 # Configure logging

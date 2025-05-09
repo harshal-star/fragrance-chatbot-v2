@@ -720,6 +720,7 @@
         
         const START_SESSION_URL = `${API_BASE_URL}/start-session`;
         const CHAT_URL = `${API_BASE_URL}/chat`;
+        const START_SESSION_STREAM_URL = `${API_BASE_URL}/start-session-stream`;
         
         // Save user ID to localStorage
         localStorage.setItem('userId', userId);
@@ -866,41 +867,59 @@
             }
         }
 
+        async function startSessionStream() {
+            const response = await fetch(START_SESSION_STREAM_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let botMessageContent = '';
+            const botMessageElement = startStreamingResponse();
+            let sessionIdSet = false;
+            let leftover = '';
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                const chunk = leftover + decoder.decode(value);
+                const lines = chunk.split('\n');
+                leftover = lines.pop(); // In case the last line is incomplete
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    if (line.startsWith('event: sessionId')) {
+                        // Next line should be data: <session_id>
+                        if (i + 1 < lines.length && lines[i + 1].startsWith('data: ')) {
+                            sessionId = lines[i + 1].slice(6).trim();
+                            sessionIdSet = true;
+                            i++; // Skip the data line
+                        }
+                    } else if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        botMessageContent += data;
+                        updateStreamingResponse(botMessageContent);
+                    }
+                }
+            }
+            endStreamingResponse();
+            // Finalize the streaming message with full formatting
+            if (currentStreamingMessage) {
+                currentStreamingMessage.innerHTML = formatMessage(botMessageContent);
+                currentStreamingMessage = null;
+            }
+            await loadSessionList(); // Refresh the left panel after streaming welcome message
+        }
+
         async function initializeChat() {
             try {
                 // Check if this is the first time user is visiting
                 const isFirstVisit = !localStorage.getItem('hasVisited');
-                const data = await startSession();  // Get session data
-                sessionId = data.session_id;  // Store the session ID
-                
-                // Add the welcome message
-                addMessage(data.message, false);
-                
+                await startSessionStream();  // Stream the welcome message
                 // Mark that user has visited
                 localStorage.setItem('hasVisited', 'true');
             } catch (error) {
                 console.error('Error initializing chat:', error);
                 addMessage('Sorry, I encountered an error. Please try again.', false);
-            }
-        }
-
-        async function startSession() {
-            try {
-                const response = await fetch(START_SESSION_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        user_id: userId
-                    })
-                });
-                const data = await response.json();
-                sessionId = data.session_id;
-                return data;  // Return the entire data object
-            } catch (error) {
-                console.error('Error starting session:', error);
-                throw error;
             }
         }
 
@@ -1006,16 +1025,16 @@
         // Start chat when page loads
         document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('message-input').focus();
+            // Hide collapse button immediately if sidebar is not collapsed
+            if (!document.getElementById('sidebar').classList.contains('collapsed')) {
+                document.getElementById('collapse-sidebar-btn').style.display = 'none';
+            }
+            await loadSessionList(); // Load session list first!
             // Only initialize chat if there is no session selected
             if (!sessionId) {
                 await initializeChat();
             } else {
                 await loadChatHistory(sessionId);
-            }
-            await loadSessionList();
-            // On page load, ensure expand button is hidden if sidebar is not collapsed
-            if (!document.getElementById('sidebar').classList.contains('collapsed')) {
-                document.getElementById('collapse-sidebar-btn').style.display = 'none';
             }
         });
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from app.models.schemas import ChatRequest, ChatResponse, ImageUploadRequest
 from app.services.chat import ChatService
@@ -10,6 +10,8 @@ from app.core.config import settings
 from pydantic import BaseModel
 import os
 from sqlalchemy.sql import text
+from app.services.session import create_session
+from app.core.ai.chat import generate_response
 
 logger = logging.getLogger(__name__)
 
@@ -24,18 +26,13 @@ class ChatRequest(BaseModel):
 
 router = APIRouter(tags=["chat"])
 
-@router.post("/start-session", response_model=Dict)
-async def start_session(request: StartSessionRequest, db: Session = Depends(get_db)):
-    """Start a new chat session."""
-    try:
-        logger.info(f"/start-session called with user_id: {request.user_id}")
-        chat_service = ChatService(db, settings)
-        result = await chat_service.start_chat(request.user_id)
-        logger.info(f"/start-session result: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Error starting session: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/start-session")
+async def start_session(request: Request, db: Session = Depends(get_db)):
+    data = await request.json()
+    user_id = data.get("user_id")
+    chat_service = ChatService(db, settings)
+    session_data = await chat_service.start_chat(user_id)
+    return session_data
 
 @router.post("/chat")
 async def chat(request: ChatRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -129,4 +126,26 @@ def create_tables():
     from app.models.models import Base, User, Session
     from app.core.database import engine
     Base.metadata.create_all(bind=engine)
-    return {"status": "tables created"} 
+    return {"status": "tables created"}
+
+@router.get("/initial-greeting/stream")
+async def stream_initial_greeting(db: Session = Depends(get_db)):
+    chat_service = ChatService(db, settings)
+    async def event_generator():
+        async for token in chat_service.stream_initial_greeting():
+            yield f"data: {token}\n\n"
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@router.post("/start-session-stream")
+async def start_session_stream(request: Request, db: Session = Depends(get_db)):
+    data = await request.json()
+    user_id = data.get("user_id")
+    chat_service = ChatService(db, settings)
+    session = create_session(user_id, db)
+    async def event_generator():
+        # Stream session ID as the first SSE event
+        yield f"event: sessionId\ndata: {session['session_id']}\n\n"
+        # Then stream the welcome message
+        async for chunk in generate_response(session, message=None, db=db):
+            yield f"data: {chunk}\n\n"
+    return StreamingResponse(event_generator(), media_type="text/event-stream") 

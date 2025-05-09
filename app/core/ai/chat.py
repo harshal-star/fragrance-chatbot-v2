@@ -24,13 +24,7 @@ async def generate_response(session: Dict, message: str, db: Session) -> AsyncGe
         # Ensure conversation history has the correct structure
         if not session.get("conversation_history"):
             session["conversation_history"] = {"messages": []}
-        
-        # # Append the user's message BEFORE generating the response
-        # session["conversation_history"]["messages"].append({
-        #     "role": "user",
-        #     "content": message,
-        #     "timestamp": datetime.utcnow().isoformat()
-        # })
+    
         
         # Format conversation history for OpenAI
         messages = [

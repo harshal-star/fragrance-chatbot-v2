@@ -24,6 +24,9 @@ from app.core.ai.chat import generate_response
 from app.services.openai_profile_extraction import OpenAIProfileExtraction
 from app.core.config import settings, Settings
 from fastapi import BackgroundTasks
+import openai
+import os
+from openai import AsyncOpenAI
 
 # Configure logging with UTF-8 encoding
 logging.basicConfig(
@@ -59,6 +62,7 @@ class ChatService:
         self.profile_service = ProfileService(db)
         self.openai_extraction = OpenAIProfileExtraction(api_key=config.OPENAI_API_KEY)
         self.analysis_service = ChatAnalysisService(self.profile_service, self.openai_extraction)
+        self.client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
 
     def get_session(self, session_id: str, db: Session) -> Optional[Dict]:
         """Get a session by ID."""
@@ -67,6 +71,26 @@ class ChatService:
         except Exception as e:
             logger.error(f"Error getting session: {str(e)}")
             return None
+
+    async def generate_initial_greeting(self):
+        prompt = """You are Lila, a friendly and creative personal fragrance consultant chatbot. Greet the user with a warm, engaging, and varied welcome message. 
+        Do not repeat the same greeting every time.
+        
+        Example:
+        Hey there! I'm Lila, your personal fragrance consultant. I'd love to help you create a fragrance that perfectly matches your style. Would you like to start by telling me a bit about yourself or sharing a photo of yourself?
+        """
+        
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        stream = await self.client.chat.completions.create(
+            model="gpt-4o-2024-08-06",
+            messages=[{"role": "system", "content": prompt}],
+            max_tokens=60,
+            temperature=0.9,
+            stream=True,
+        )
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
 
     async def start_chat(self, user_id: str) -> Dict:
         """Start a new chat session for a user."""
@@ -89,7 +113,10 @@ class ChatService:
             session = create_session(user_id, self.db)
             print(f"New session created: {session}")
             
-            initial_message = "Hey there! I'm Lila, your personal fragrance consultant. I'd love to help you create a fragrance that perfectly matches your style. Would you like to start by telling me a bit about yourself or sharing a photo of yourself?"
+            # Generate initial message using the system prompt logic (no user message)
+            initial_message = ""
+            async for token in generate_response(session, message=None, db=self.db):
+                initial_message += token
             
             # Add initial message to conversation history
             session["conversation_history"]["messages"].append({
@@ -347,4 +374,23 @@ class ChatService:
                 yield f"data: {chunk}\n\n"
         except Exception as e:
             logger.error(f"Error in process_message_stream: {str(e)}")
-            yield f"data: Error: {str(e)}\n\n" 
+            yield f"data: Error: {str(e)}\n\n"
+
+    async def stream_initial_greeting(self):
+        prompt = (
+            "You are Lila, a friendly and creative personal fragrance consultant chatbot. "
+            "Greet the user with a warm, engaging, and varied welcome message. "
+            "Do not repeat the same greeting every time. Example: "
+            "Hey there! I'm Lila, your personal fragrance consultant. I'd love to help you create a fragrance that perfectly matches your style. Would you like to start by telling me a bit about yourself or sharing a photo of yourself?"
+        )
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        stream = await self.client.chat.completions.create(
+            model="gpt-4o-2024-08-06",
+            messages=[{"role": "system", "content": prompt}],
+            max_tokens=60,
+            temperature=0.9,
+            stream=True,
+        )
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content 
