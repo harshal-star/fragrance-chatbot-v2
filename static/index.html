@@ -247,9 +247,15 @@
             background-color: var(--primary-bg);
             .chat-input { flex-direction: column; gap: 0.5rem; padding: 1rem 0.5rem; }
             #user-input { width: 100%; }
-            .chat-input-wrapper {padding-bottom: max(0.15rem, env(safe-area-inset-bottom));
-            box-shadow: none; /* overrides pb-4 */}
+            .chat-input-wrapper {
+                /* padding-bottom: max(1rem, env(safe-area-inset-bottom)); */
+                box-shadow: none; /* overrides pb-4 */}
         }
+
+        .chat-input-wrapper {
+            padding-bottom: max(1rem, env(safe-area-inset-bottom)); /* Enable this */
+            }
+
         .custom-header-bg {
             background: var(--sidebar-header-bg);
             color: var(--text-main);
