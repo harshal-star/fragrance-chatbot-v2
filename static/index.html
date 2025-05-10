@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <title>Your Personal Fragrance Stylist</title>
+    <title>Lila - Your Personal Fragrance Stylist</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -57,7 +57,12 @@
             --bubble-user: linear-gradient(90deg, #a78bfa 0%, #f0abfc 100%);
             --bubble-bot: #fff;
             --text-main: #312e81;
+            --text-secondary: #7f8c8d;
             --accent: #a78bfa;
+            --sidebar-bg: #232136;
+            --sidebar-header-bg: #a78bfa;
+            --input-bg: #fff;
+            --input-border: #e5e7eb;
         }
         body.dark {
             --primary-bg: #18122b;
@@ -65,27 +70,58 @@
             --bubble-user: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
             --bubble-bot: #232136;
             --text-main: #e0e7ff;
+            --text-secondary: #a1a1aa;
             --accent: #a78bfa;
+            --sidebar-bg: #18122b;
+            --sidebar-header-bg: #232136;
+            --input-bg: #232136;
+            --input-border: #3b3b4f;
         }
         body {
             background: var(--primary-bg);
             color: var(--text-main);
             transition: background 0.5s, color 0.5s;
         }
-        .glass-card {
+        .glass-card, .message-content {
             background: var(--card-bg);
-            transition: background 0.5s;
-        }
-        .prose, .prose-sm {
-            color: var(--text-main) !important;
-        }
-        .message-content {
-            background: var(--bubble-bot);
-            transition: background 0.5s;
+            color: var(--text-main);
+            transition: background 0.5s, color 0.5s;
         }
         .message.self-end .message-content {
             background: var(--bubble-user);
             color: #fff;
+        }
+        .message.self-start .message-content {
+            background: var(--bubble-bot);
+            color: var(--text-main);
+        }
+        .chat-input {
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+        }
+        #user-input {
+            background: var(--input-bg);
+            color: var(--text-main);
+            border: 1px solid var(--input-border);
+        }
+        .message-timestamp, .session-date {
+            color: var(--text-secondary) !important;
+        }
+        .message-status {
+            color: var(--text-main);
+        }
+        .message-content {
+            transition: background 0.5s;
+        }
+        .message.self-end {
+            margin-left: auto;
+            margin-right: 0;
+            align-items: flex-end;
+        }
+        .message.self-start {
+            margin-right: auto;
+            margin-left: 0;
+            align-items: flex-start;
         }
 
         /* Mobile Optimizations */
@@ -192,19 +228,39 @@
             .chat-input { flex-direction: column; gap: 0.5rem; padding: 1rem 0.5rem; }
             #user-input { width: 100%; }
         }
+        .custom-header-bg {
+            background: var(--sidebar-header-bg);
+            color: var(--text-main);
+            transition: background 0.5s, color 0.5s;
+        }
+        .custom-sidebar-bg {
+            background: var(--sidebar-bg);
+            color: var(--text-main);
+            border-color: var(--input-border);
+            transition: background 0.5s, color 0.5s, border-color 0.5s;
+        }
+        .custom-main-bg {
+            background: var(--primary-bg);
+            color: var(--text-main);
+            transition: background 0.5s, color 0.5s;
+        }
+        body.dark .animated-bg {
+            background: linear-gradient(120deg, #232136 0%, #7c3aed 100%);
+            opacity: 0.18;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-primary-light to-white min-h-screen font-inter text-text-primary flex flex-col">
     <div class="flex flex-col w-full h-screen">
         <!-- Header -->
-        <header class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary to-accent relative">
+        <header class="flex items-center justify-between px-4 py-3 custom-header-bg relative">
             <div class="flex items-center gap-2">
                 <button id="menu-toggle" class="p-2 text-white md:hidden">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 12h18M3 6h18M3 18h18"></path>
                     </svg>
                 </button>
-                <h1 class="text-xl md:text-2xl font-bold text-white tracking-tight">Your Personal Fragrance Stylist</h1>
+                <h1 class="text-xl md:text-2xl font-bold text-white tracking-tight">Lila - Your Personal Fragrance Stylist</h1>
             </div>
             <div class="flex items-center gap-2 header-buttons">
                 <button id="theme-toggle" class="px-2 py-1 rounded-lg bg-white/70 text-purple-700 font-semibold shadow transition hover:bg-purple-100 z-40">🌙</button>
@@ -213,14 +269,14 @@
         </header>
         <div class="flex flex-1 overflow-hidden relative">
             <!-- Sidebar -->
-            <aside id="sidebar" class="sidebar w-64 bg-background-dark text-white flex flex-col border-r border-gray-700 transition-all duration-300 z-10">
-                <div class="sidebar-header bg-primary-dark px-4 py-3 font-bold text-lg">Lila</div>
+            <aside id="sidebar" class="sidebar w-64 custom-sidebar-bg flex flex-col border-r transition-all duration-300 z-10">
+                <!-- <div class="sidebar-header bg-primary-dark px-4 py-3 font-bold text-lg">Lila</div> -->
                 <div id="session-list" class="flex-1 overflow-y-auto mt-2 px-2"></div>
             </aside>
             <!-- Overlay for mobile -->
             <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
             <!-- Main Panel -->
-            <div class="main-panel flex flex-col flex-1 h-full bg-gradient-to-b from-background-light to-primary-light transition-all duration-300">
+            <div class="main-panel flex flex-col flex-1 h-full custom-main-bg transition-all duration-300">
                 <!-- Chat Messages -->
                 <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-6 space-y-2"></div>
                 <!-- Image Preview (dynamic) -->
@@ -301,19 +357,18 @@
             return { messageDiv, contentDiv };
         }
         
-        function addMessage(message, isUser, showTimestamp = true) {
+        function addMessage(message, isUser, showTimestamp = true, allowEmpty = false) {
+            if ((!message || message.trim() === '') && !allowEmpty) {
+                // Do not create a bubble for empty messages unless allowed (for streaming)
+                return null;
+            }
             const chatMessages = document.getElementById('chat-messages');
             const messageWrapper = document.createElement('div');
             messageWrapper.className = `message flex flex-col max-w-[85%] ${isUser ? 'self-end items-end' : 'self-start items-start'} mb-2 fade-in-up`;
-            
             const messageContent = document.createElement('div');
             messageContent.className = `glass-card prose max-w-none message-content px-5 py-3 rounded-chat shadow-chat text-base ${isUser ? 'bg-gradient-to-br from-primary to-accent text-white rounded-br-md' : 'bg-white text-text-primary rounded-bl-md border border-gray-200'} mb-1`;
-            
-            // Add message HTML directly without avatar
             messageContent.innerHTML = formatMessage(message);
             messageWrapper.appendChild(messageContent);
-
-            // Only show timestamp if requested (not during streaming)
             if (showTimestamp) {
                 const timestamp = document.createElement('div');
                 timestamp.className = 'message-timestamp text-xs text-text-secondary mt-1';
@@ -327,8 +382,8 @@
         }
 
         function startStreamingResponse(isUser = false) {
-            // Only show the message bubble, no timestamp yet
-            return addMessage('', isUser, false);
+            // Always allow an empty bubble for streaming
+            return addMessage('', isUser, false, true);
         }
 
         function updateStreamingResponse(formattedText) {
@@ -600,12 +655,17 @@
             if (themeToggle) {
                 themeToggle.removeEventListener('click', toggleTheme);
                 themeToggle.addEventListener('click', toggleTheme);
+                // Set correct icon on load
+                themeToggle.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
             }
         }
 
         function toggleTheme() {
             document.body.classList.toggle('dark');
-            themeToggle.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) {
+                themeToggle.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+            }
         }
 
         async function startSession(isNewChat = false) {
