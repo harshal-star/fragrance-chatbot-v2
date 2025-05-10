@@ -246,6 +246,7 @@
             header .flex.items-center.gap-3 { gap: 0.5rem; }
             .chat-input { flex-direction: column; gap: 0.5rem; padding: 1rem 0.5rem; }
             #user-input { width: 100%; }
+            .chat-input-wrapper {padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); /* overrides pb-4 */}
         }
         .custom-header-bg {
             background: var(--sidebar-header-bg);
@@ -315,7 +316,7 @@
                 <!-- Image Preview (dynamic) -->
                 <div id="image-preview-container" class="image-preview-container"></div>
                 <!-- Chat Input -->
-                <div class="w-full px-4 pb-4 sticky bottom-0 bg-[var(--primary-bg)] z-20">
+                <div class="w-full px-4 pb-4 sticky bottom-0 bg-[var(--primary-bg)] z-20 chat-input-wrapper">
                     <div class="max-w-4xl mx-auto w-full flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-[25px] px-4 py-8 shadow transition-all">
                       <input
                         id="user-input"
