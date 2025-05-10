@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <title>Lila - Your Personal Fragrance Stylist</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -144,6 +144,8 @@
 
             .main-panel {
                 width: 100%;
+                overflow-y: auto;
+                scroll-behavior: smooth;
             }
 
             .message {
@@ -274,7 +276,11 @@
             </div>
             <div class="flex items-center gap-2 header-buttons">
                 <button id="theme-toggle" class="px-2 py-1 rounded-lg bg-white/70 text-purple-700 font-semibold shadow transition hover:bg-purple-100 z-40">🌙</button>
-                <button class="bg-accent text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-medium shadow hover:bg-primary-dark transition new-chat-button" id="new-chat-btn">+ New Chat</button>
+                <!-- <button class="bg-accent text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-medium shadow hover:bg-primary-dark transition new-chat-button" id="new-chat-btn">+ New Chat</button> -->
+                <button class="bg-accent text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium shadow hover:bg-primary-dark transition whitespace-nowrap text-sm sm:text-base" id="new-chat-btn">
+                    + New Chat
+                </button>
+                  
             </div>
         </header>
         <div class="flex flex-1 overflow-hidden relative">
@@ -299,7 +305,7 @@
                         type="text"
                         placeholder="Type your message here..."
                         autocomplete="on"
-                        class="flex-1 appearance-none bg-transparent border-none outline-none ring-0 shadow-none text-base placeholder:text-[var(--text-secondary)] text-[var(--text-main)]"
+                        class="text-sm sm:text-base flex-1 appearance-none bg-transparent border-none outline-none ring-0 shadow-none text-base placeholder:text-[var(--text-secondary)] text-[var(--text-main)]"
                       />
                       <input type="file" id="image-upload" accept="image/*" multiple class="hidden" />
                       <button id="upload-btn" type="button" class="text-[var(--text-secondary)] hover:text-[var(--accent)]" title="Upload image">
