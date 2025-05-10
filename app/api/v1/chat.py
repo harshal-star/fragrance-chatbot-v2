@@ -131,13 +131,13 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
     return {"status": "tables created"}
 
-@router.get("/initial-greeting/stream")
-async def stream_initial_greeting(db: Session = Depends(get_db)):
-    chat_service = ChatService(db, settings)
-    async def event_generator():
-        async for token in chat_service.stream_initial_greeting():
-            yield f"data: {token}\n\n"
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+# @router.get("/initial-greeting/stream")
+# async def stream_initial_greeting(db: Session = Depends(get_db)):
+#     chat_service = ChatService(db, settings)
+#     async def event_generator():
+#         async for token in chat_service.stream_initial_greeting():
+#             yield f"data: {token}\n\n"
+#     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.post("/start-session-stream")
 async def start_session_stream(request: Request, db: Session = Depends(get_db)):

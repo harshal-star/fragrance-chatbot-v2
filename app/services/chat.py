@@ -377,25 +377,6 @@ class ChatService:
             logger.error(f"Error in process_message_stream: {str(e)}")
             yield f"data: Error: {str(e)}\n\n"
 
-    async def stream_initial_greeting(self):
-        prompt = (
-            "You are Lila, a friendly and creative personal fragrance consultant chatbot. "
-            "Greet the user with a warm, engaging, and varied welcome message. "
-            "Do not repeat the same greeting every time. Example: "
-            "Hey there! I'm Lila, your personal fragrance consultant. I'd love to help you create a fragrance that perfectly matches your style. Would you like to start by telling me a bit about yourself or sharing a photo of yourself?"
-        )
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        stream = await self.client.chat.completions.create(
-            model="gpt-4o-2024-08-06",
-            messages=[{"role": "system", "content": prompt}],
-            max_tokens=60,
-            temperature=0.9,
-            stream=True,
-        )
-        async for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content 
-
     async def process_image_stream(self, session_id, image_data, message, message_id):
         """
         Stream the assistant's response for image analysis.
@@ -442,7 +423,7 @@ class ChatService:
                     print("Streaming chunk:", content, flush=True)
                     analysis_text += content
                     yield f"data: {content}\n\n"
-                    yield f": keep-alive\n\n"
+                    # yield f": keep-alive\n\n"
             # Save the analysis to the session history
             session["conversation_history"]["messages"].append({
                 "role": "assistant",
