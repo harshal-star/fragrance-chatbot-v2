@@ -146,6 +146,12 @@
                 width: 100%;
                 overflow-y: auto;
                 scroll-behavior: smooth;
+                padding-bottom: 80px; /* ensure space under keyboard */
+            }
+
+            .header-buttons button {
+                font-size: 14px;
+                padding: 6px 10px;
             }
 
             .message {
@@ -157,7 +163,9 @@
             }
 
             #user-input {
+                width: 100%;
                 font-size: 16px; /* Prevents zoom on iOS */
+                padding: 0.75rem;
             }
 
             .header-buttons {
@@ -307,7 +315,7 @@
                 <!-- Image Preview (dynamic) -->
                 <div id="image-preview-container" class="image-preview-container"></div>
                 <!-- Chat Input -->
-                <div class="w-full px-4 pb-4">
+                <div class="w-full px-4 pb-4 sticky bottom-0 bg-[var(--primary-bg)] z-20">
                     <div class="max-w-4xl mx-auto w-full flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-[25px] px-4 py-8 shadow transition-all">
                       <input
                         id="user-input"
