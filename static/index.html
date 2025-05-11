@@ -147,7 +147,8 @@
                 height: 100%;
                 overflow-y: auto;
                 overscroll-behavior: contain;
-                padding-bottom: 0 !important;
+                padding-bottom: 160px !important;
+                scroll-behavior: smooth;
             }
             .chat-input-wrapper {
                 position: fixed;
@@ -245,15 +246,17 @@
             position: relative;
             flex-grow: 1;
             overflow-y: auto;
-            padding-top: 8px; /* Reduced gap below header */
-            padding-bottom: calc(var(--chat-bar-h) + 1rem); /* Leaves space for input */
+            padding-top: 12px; /* Reduced gap below header */
+            /* padding-bottom: calc(var(--chat-bar-h) + 2.5rem); More space for input and message margin */
             scroll-behavior: smooth;
+            padding-bottom: 160px !important;
             }
 
         /* Fix for mobile: ensure first message is always below header */
         @media (max-width: 768px) {
           #chat-messages {
             padding-top: calc(var(--header-height) + 5px) !important;
+            padding-bottom: calc(var(--chat-bar-h) + 2.5rem) !important;
           }
         }
 
@@ -272,7 +275,21 @@
             -webkit-text-size-adjust: 100%; /* iOS font scaling fix */
             }
 
+        html, body {
+            overscroll-behavior: none;
+            touch-action: manipulation;
+            -webkit-overflow-scrolling: touch;
+            }
+
         @media (min-width: 769px) {
+            html, body {
+                height: 100vh;
+                overflow: hidden !important; /* Prevent double scrollbars */
+            }
+            .main-layout, .main-panel {
+                height: 100vh;
+                overflow: hidden !important;
+            }
             .sidebar {
                 position: fixed;
                 left: 0;
@@ -387,7 +404,8 @@
                 height: 100%;
                 overflow-y: auto;
                 overscroll-behavior: contain;
-                padding-bottom: 0 !important;
+                padding-bottom: 160px !important;
+                scroll-behavior: smooth;
             }
         }
 
@@ -626,6 +644,15 @@
             return { messageDiv, contentDiv };
         }
         
+        function scrollLastMessageIntoView() {
+            const chatMessages = document.getElementById('chat-messages');
+            const chatInputWrapper = document.querySelector('.chat-input-wrapper');
+            const inputHeight = chatInputWrapper ? chatInputWrapper.offsetHeight : 0;
+
+            // Scroll so the bottom of the chat is just above the input
+            chatMessages.scrollTop = chatMessages.scrollHeight - chatMessages.clientHeight - inputHeight - 16; // 16px gap
+        }
+
         function addMessage(message, isUser, showTimestamp = true, allowEmpty = false) {
             if ((!message || message.trim() === '') && !allowEmpty) {
                 // Do not create a bubble for empty messages unless allowed (for streaming)
@@ -646,7 +673,12 @@
                 messageWrapper.appendChild(timestamp);
             }
             chatMessages.appendChild(messageWrapper);
-            chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+            // Move scroll-anchor to bottom
+            let anchor = document.getElementById('scroll-anchor');
+            if (anchor) {
+                chatMessages.appendChild(anchor);  // re-append to the end
+            }
+            scrollLastMessageIntoView();
             return messageContent;
         }
 
@@ -678,6 +710,7 @@
                     parent.appendChild(timestamp);
                 }
                 currentStreamingMessage = null;
+                scrollToBottomSmooth();
             }
         }
 
@@ -741,6 +774,7 @@
                         }
                         const safeHTML = DOMPurify.sanitize(marked.parse(botMessage));
                         updateStreamingResponse(safeHTML);
+                        scrollToBottomSmooth();
                     }
                 }
             }
@@ -784,6 +818,13 @@
                     fn(...args);
                 }
             };
+        }
+
+        function scrollToBottomSmooth() {
+            const chatMessages = document.getElementById('chat-messages');
+            requestAnimationFrame(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
         }
 
         async function sendMessage() {
@@ -858,6 +899,7 @@
 
                                 const html = DOMPurify.sanitize(marked.parse(rawMarkdown));
                                 updateStreamingResponse(html);
+                                scrollToBottomSmooth();
                             }
                         }
                     }
@@ -896,6 +938,7 @@
                 await initializeChat();
             } else {
                 await loadChatHistory(sessionId);
+                scrollToBottomSmooth();
             }
         });
 
