@@ -518,6 +518,62 @@
           }
         }
 
+        /* Scrollbar for chat messages container */
+        #chat-messages::-webkit-scrollbar {
+        width: 8px;
+        }
+
+        #chat-messages::-webkit-scrollbar-track {
+        background: transparent;
+        }
+
+        #chat-messages::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 39, 176, 0.3); /* soft purple tone */
+        border-radius: 10px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        transition: background-color 0.3s ease;
+        }
+
+        #chat-messages::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(156, 39, 176, 0.6);
+        }
+
+        /* Optional: hide scrollbar on mobile */
+        @media (max-width: 768px) {
+        #chat-messages::-webkit-scrollbar {
+            display: none;
+        }
+        }
+
+        /* Style for session cards in dark mode */
+        body.dark .session-item {
+        background-color: #2d2542; /* Dark purple */
+        color: #e4dcff;            /* Softer, brighter lavender-white */
+        border: 1px solid #3f3552;
+        }
+
+        body.dark .session-item:hover {
+        background-color: #3a2a54;
+        border-color: #a78bfa;
+        }
+
+        body.dark .session-item .session-preview {
+        font-weight: 500;
+        color: #f5f3ff; /* Brighter for preview line */
+        }
+
+        body.dark .session-item .session-date {
+        color: #bbaedf; /* Softer secondary text */
+        }
+
+        body.dark .session-item.active,
+        body.dark .session-item.bg-primary {
+        background-color: #a78bfa;
+        color: #fff;
+        border-color: #a78bfa;
+        }
+
     </style>
 </head>
 <!-- <body class="bg-gradient-to-br from-primary-light to-white min-h-screen font-inter text-text-primary flex flex-col"> -->
