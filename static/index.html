@@ -52,6 +52,8 @@
     </script>
     <style>
         :root {
+            --chat-bar-h:72px;
+            --header-height: 72px;
             --primary-bg: #f5f3ff;
             --card-bg: rgba(255,255,255,0.7);
             --bubble-user: linear-gradient(90deg, #a78bfa 0%, #f0abfc 100%);
@@ -63,6 +65,7 @@
             --sidebar-header-bg: #a78bfa;
             --input-bg: #fff;
             --input-border: #e5e7eb;
+            --chat-input-bg: #fff;
         }
         body.dark {
             --primary-bg: #18122b;
@@ -74,8 +77,9 @@
             --accent: #a78bfa;
             --sidebar-bg: #18122b;
             --sidebar-header-bg: #232136;
-            --input-bg: #18122b; /* match primary-bg */
+            --input-bg: #231a36; /* darker, but distinct from background */
             --input-border: #3b3b4f;
+            --chat-input-bg: #231a36;
         }
         body {
             background: var(--primary-bg);
@@ -102,7 +106,9 @@
         #user-input {
             background: var(--input-bg);
             color: var(--text-main);
-            border: 1px solid var(--input-border);
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
         }
         .message-timestamp, .session-date {
             color: var(--text-secondary) !important;
@@ -126,6 +132,44 @@
 
         /* Mobile Optimizations */
         @media (max-width: 768px) {
+            html, body {
+                height: auto !important;
+                min-height: 100dvh !important;
+                overflow: hidden !important;
+            }
+            .main-panel {
+                display: flex !important;
+                height: calc(100dvh - var(--chat-bar-h));
+                padding-bottom: 0 !important;
+                overflow: hidden !important;
+            }
+            #chat-messages {
+                height: 100%;
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                padding-bottom: 0 !important;
+            }
+            .chat-input-wrapper {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                height: var(--chat-bar-h);
+                z-index: 100;
+                background: var(--primary-bg);
+                display: flex;
+                align-items: center;
+                padding: 0 .75rem;
+                box-shadow: 0 -2px 6px rgb(0 0 0 / .05);
+            }
+            /* Remove any margin/padding from parent containers */
+            .flex.flex-col.w-full.h-screen {
+                display: block !important;
+                height: auto !important;
+                min-height: 100dvh !important;
+                width: 100vw !important;
+                overflow: visible !important;
+            }
             .sidebar {
                 position: fixed;
                 left: -100%;
@@ -142,13 +186,6 @@
                 left: 0;
             }
 
-            .main-panel {
-                width: 100%;
-                overflow-y: auto;
-                scroll-behavior: smooth;
-                padding-bottom: 80px; /* ensure space under keyboard */
-            }
-
             .header-buttons button {
                 font-size: 14px;
                 padding: 6px 10px;
@@ -159,8 +196,10 @@
             }
 
             .chat-input {
-                padding: 0.75rem;
-            }
+                padding: 0.25rem 0.5rem;
+                gap: 0.5rem;
+                flex-direction: column;
+                }
 
             #user-input {
                 width: 100%;
@@ -172,14 +211,50 @@
                 gap: 0.5rem;
             }
 
-            html, body {
-                height: 100%;
-                overscroll-behavior-y: contain;
-            }
-
             #chat-messages {
                 scroll-behavior: smooth;
+                overflow-anchor: none;
+                will-change: transform;
+
             }
+
+            .chat-input-wrapper {
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                height: var(--chat-bar-h);
+                z-index: 100;
+                background: var(--primary-bg);
+                display: flex;
+                align-items: center;
+                padding: 0 .75rem;
+                box-shadow: 0 -2px 6px rgb(0 0 0 / .05);
+            }
+        }
+
+        #chat-messages .message:first-child {
+            margin-top: 0 !important;
+            }
+
+        #chat-messages .message {
+            margin-bottom: 0.5rem; /* spacing between messages */
+            }
+
+        #chat-messages {
+            position: relative;
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-top: 8px; /* Reduced gap below header */
+            padding-bottom: calc(var(--chat-bar-h) + 1rem); /* Leaves space for input */
+            scroll-behavior: smooth;
+            }
+
+        /* Fix for mobile: ensure first message is always below header */
+        @media (max-width: 768px) {
+          #chat-messages {
+            padding-top: calc(var(--header-height) + 5px) !important;
+          }
         }
 
         /* Sidebar transition and animation */
@@ -191,25 +266,53 @@
                         transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
                         left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        @media (min-width: 769px) {
-            .sidebar.collapsed {
-                width: 0 !important;
-                min-width: 0 !important;
-                max-width: 0 !important;
-                opacity: 0;
-                transform: translateX(-40px);
-                pointer-events: none;
-                border: none !important;
-                padding: 0 !important;
+
+        html {
+            font-size: 16px; /* ensures consistent rem units */
+            -webkit-text-size-adjust: 100%; /* iOS font scaling fix */
             }
-            .sidebar:not(.collapsed) {
-                opacity: 1;
-                transform: translateX(0);
+
+        @media (min-width: 769px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: var(--header-height);
+                bottom: 0;
+                height: calc(100vh - var(--header-height));
+                width: 256px;
+                z-index: 20;
+                border-right: 1px solid var(--input-border);
+            }
+            .main-panel {
+                margin-left: 256px;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                background: var(--primary-bg);
+            }
+            .chat-input-wrapper {
+                margin-left: 256px;
+                width: calc(100vw - 256px);
+                position: sticky;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 10;
+                background: var(--primary-bg);
+                box-shadow: 0 -2px 6px rgb(0 0 0 / .05);
+                border-radius: 0 0 25px 25px;
             }
             .main-panel.sidebar-collapsed {
                 margin-left: 0 !important;
+                width: 100vw !important;
+                transition: margin-left 0.3s, width 0.3s;
+            }
+            .chat-input-wrapper.sidebar-collapsed {
+                margin-left: 0 !important;
+                width: 100vw !important;
             }
         }
+
         @media (max-width: 768px) {
             .sidebar {
                 transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -244,7 +347,7 @@
         /* Animated gradient background */
         .animated-bg {
             position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
+            top: 0; left: 0; width: 100vw; height: 100dvh;
             z-index: 0;
             pointer-events: none;
             background: linear-gradient(120deg, #a78bfa 0%, #f0abfc 100%);
@@ -271,19 +374,34 @@
             50% { transform: translateY(-30px) scale(1.08); }
             100% { transform: translateY(0) scale(1); }
         }
+        
         @media (max-width: 640px) {
-            header .flex.items-center.gap-3 { gap: 0.5rem; }
-            body { background-color: var(--primary-bg); }
-            .chat-input { flex-direction: column; gap: 0.5rem; padding: 1rem 0.5rem; }
-            #user-input { width: 100%; }
-            .chat-input-wrapper {
-                /* padding-bottom: max(1rem, env(safe-area-inset-bottom)); */
-                box-shadow: none; /* overrides pb-4 */
+            .main-layout {
+                display: block !important;
+                height: calc(100dvh - var(--chat-bar-h)); /* or use JS to set this dynamically */
+                padding-bottom: 0 !important;
+                overflow: hidden !important;
+                /* padding-bottom: 70px !important; */
+            }
+            #chat-messages {
+                height: 100%;
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                padding-bottom: 0 !important;
             }
         }
 
-        .chat-input-wrapper {
-            padding-bottom: max(1rem, env(safe-area-inset-bottom)); /* Enable this */
+        .chat-input-wrapper{
+            position:fixed;
+            inset-inline:0;
+            bottom:env(safe-area-inset-bottom,0);
+            height:var(--chat-bar-h);          /* ❄️ constant height */
+            display:flex;align-items:center;
+            background:var(--primary-bg);
+            /* padding:0 .75rem;                  no calc() that changes */
+            padding: 0.5rem 0.75rem 4rem; /* ⬅️ This adds space inside the wrapper */
+            box-shadow:0 -2px 6px rgb(0 0 0 / .05);
+            z-index:50;
             }
 
         .custom-header-bg {
@@ -335,13 +453,59 @@
         overflow: hidden;
         }
 
+        header.custom-header-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            z-index: 100;
+        }
+        .main-layout {
+            margin-top: var(--header-height);
+        }
+
+        .header-title-mobile {
+            display: none;
+        }
+        @media (max-width: 768px) {
+            .header-title-desktop {
+                display: none !important;
+            }
+            .header-title-mobile {
+                display: block !important;
+            }
+        }
+
+        body.dark #user-input {
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        body.dark .chat-input {
+            background: var(--input-bg) !important;
+            box-shadow: 0 2px 8px 0 rgba(0,0,0,0.18);
+        }
+
+        .chat-input-outer {
+            background: var(--chat-input-bg) !important;
+            transition: background 0.3s;
+        }
+
+        @media (max-width: 768px) {
+          #chat-messages {
+            padding-top: calc(var(--header-height) + 5px) !important;
+          }
+          .sidebar .sidebar-content {
+            padding-top: var(--header-height) !important;
+          }
+        }
 
     </style>
 </head>
 <!-- <body class="bg-gradient-to-br from-primary-light to-white min-h-screen font-inter text-text-primary flex flex-col"> -->
 <body class="bg-[var(--primary-bg)] min-h-screen font-inter text-text-primary flex flex-col">
 
-    <div class="flex flex-col w-full h-screen">
+    <div class="w-full h-screen md:flex md:flex-col">
         <!-- Header -->
         <header class="flex items-center justify-between px-4 py-3 custom-header-bg relative">
             <div class="flex items-center gap-2">
@@ -351,7 +515,8 @@
                         <path d="M3 12h18M3 6h18M3 18h18"></path>
                     </svg>
                 </button>
-                <h1 class="text-xl md:text-2xl font-bold text-white tracking-tight">Lila - Your Personal Fragrance Stylist</h1>
+                <h1 class="header-title-desktop text-xl md:text-2xl font-bold text-white tracking-tight">Lila - Your Personal Fragrance Stylist</h1>
+                <h1 class="header-title-mobile text-xl md:text-2xl font-bold text-white tracking-tight">Lila</h1>
             </div>
             <div class="flex items-center gap-2 header-buttons">
                 <button id="theme-toggle" class="px-2 py-1 rounded-lg bg-white/70 text-purple-700 font-semibold shadow transition hover:bg-purple-100 z-40">🌙</button>
@@ -360,50 +525,41 @@
                 </button>
             </div>
         </header>
-        <div class="flex flex-1 overflow-hidden relative">
-            <!-- Sidebar -->
-            <aside id="sidebar" class="sidebar custom-sidebar-bg flex flex-col border-r transition-all duration-300 z-10">
+        <div class="main-layout">
+            <aside id="sidebar" class="sidebar custom-sidebar-bg flex flex-col border-r transition-all duration-300 z-50">
                 <div class="sidebar-content">
                     <div id="session-list" class="flex-1 overflow-y-auto mt-2 px-2"></div>
                 </div>
             </aside>
-            <!-- Overlay for mobile -->
             <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
-            <!-- Main Panel -->
-            <div class="main-panel flex flex-col flex-1 h-full custom-main-bg transition-all duration-300">
-                <!-- Chat Messages -->
-                <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-6 space-y-2"></div>
-                <!-- Image Preview (dynamic) -->
+            <div class="main-panel custom-main-bg transition-all duration-300">
+                <div id="chat-messages" class="overflow-y-auto px-4"></div>
                 <div id="image-preview-container" class="image-preview-container"></div>
-                <!-- Chat Input -->
-                <div class="w-full px-4 sticky bottom-0 z-20 chat-input-wrapper bg-transparent">
-                    <div class="max-w-4xl mx-auto w-full flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-[25px] px-4 py-8 shadow transition-all">
-                      <input
-                        id="user-input"
-                        type="text"
-                        placeholder="Type your message here..."
-                        autocomplete="on"
-                        class="text-sm sm:text-base flex-1 appearance-none bg-transparent border-none outline-none ring-0 shadow-none text-base placeholder:text-[var(--text-secondary)] text-[var(--text-main)]"
-                      />
-                      <input type="file" id="image-upload" accept="image/*" multiple class="hidden" />
-                      <button id="upload-btn" type="button" class="text-[var(--text-secondary)] hover:text-[var(--accent)]" title="Upload image">
-                        <!-- Paperclip icon -->
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l9.2-9.19"/>
-                        </svg>
-                      </button>
-                      <button id="send-btn" type="submit" class="bg-[var(--accent)] hover:bg-primary-dark text-white rounded-full p-2 shadow transition" title="Send message">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <line x1="22" y1="2" x2="11" y2="13"></line>
-                          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                        </svg>
-                      </button>
-                    </div>
+                <div class="bottom-0 z-20 chat-input-wrapper bg-transparent">
+                  <div class="max-w-4xl mx-auto w-full flex items-center gap-2 chat-input-outer backdrop-blur-md border border-[var(--input-border)] rounded-[25px] px-3 py-7 shadow transition-all min-h-[24px]">
+                    <input
+                      id="user-input"
+                      type="text"
+                      placeholder="Type your message here..."
+                      autocomplete="on"
+                      class="text-sm sm:text-base flex-1 appearance-none bg-transparent border-none outline-none ring-0 rounded-full px-2 py-2 placeholder:text-[var(--text-secondary)] text-[var(--text-main)]"
+                    />
+                    <input type="file" id="image-upload" accept="image/*" multiple class="hidden" />
+                    <button id="upload-btn" type="button" class="text-[var(--text-secondary)] hover:text-[var(--accent)]" title="Upload image">
+                      <!-- Paperclip icon -->
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l9.2-9.19"/>
+                      </svg>
+                    </button>
+                    <button id="send-btn" type="submit" class="bg-[var(--accent)] hover:bg-primary-dark text-white rounded-full p-2 shadow transition" title="Send message">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                      </svg>
+                    </button>
                   </div>
-                  
-  
-  
-                  
+                </div>
+                 
                 
                 <!-- Typing indicator -->
                 <div id="typing-indicator" class="typing-indicator hidden"></div>
@@ -777,23 +933,25 @@
                 } else {
                     const expandedWidth = '256px';
                     const isCollapsed = sidebar.classList.contains('collapsed');
-
+                    const inputWrapper = document.querySelector('.chat-input-wrapper');
                     if (isCollapsed) {
-                    sidebar.classList.remove('collapsed');
-                    requestAnimationFrame(() => {
-                        sidebar.style.width = expandedWidth;
-                        mainPanel.classList.remove('sidebar-collapsed');
-                    });
+                        sidebar.classList.remove('collapsed');
+                        requestAnimationFrame(() => {
+                            sidebar.style.width = expandedWidth;
+                            mainPanel.classList.remove('sidebar-collapsed');
+                            if (inputWrapper) inputWrapper.classList.remove('sidebar-collapsed');
+                        });
                     } else {
-                    sidebar.style.width = getComputedStyle(sidebar).width;
-                    requestAnimationFrame(() => {
-                        sidebar.style.width = '0px';
-                        sidebar.classList.add('collapsed');
-                        mainPanel.classList.add('sidebar-collapsed');
-                    });
+                        sidebar.style.width = getComputedStyle(sidebar).width;
+                        requestAnimationFrame(() => {
+                            sidebar.style.width = '0px';
+                            sidebar.classList.add('collapsed');
+                            mainPanel.classList.add('sidebar-collapsed');
+                            if (inputWrapper) inputWrapper.classList.add('sidebar-collapsed');
+                        });
                     }
                 }
-                }
+            }
 
             sidebar.addEventListener('transitionend', (e) => {
             if (e.propertyName === 'width' && sidebar.classList.contains('collapsed')) {
@@ -1053,11 +1211,34 @@
 
         async function selectSession(sid) {
             sessionId = sid;
-            await loadChatHistory(sid);
-            await loadSessionList();
+
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+
+                // Close sidebar
+                sidebar.classList.remove('open');
+                overlay.classList.add('hidden');
+                document.body.style.overflow = '';
+
+                // Defer the loading until after DOM updates are flushed
+                requestAnimationFrame(() => {
+                    setTimeout(async () => {
+                        console.log("Calling loadChatHistory() for mobile");
+                        await loadChatHistory(sid);
+                        await loadSessionList();
+                        document.getElementById('user-input').focus();
+                    }, 100); // Slight delay ensures layout finishes
+                });
+            } else {
+                await loadChatHistory(sid);
+                await loadSessionList();
+                document.getElementById('user-input').focus();
+            }
         }
 
         async function loadChatHistory(sid) {
+            console.log("Loading messages for session:", sid);
             const response = await fetch(`${API_BASE_URL}/history/${sid}`);
             const data = await response.json();
             document.getElementById('chat-messages').innerHTML = '';
@@ -1091,8 +1272,15 @@
             }
         }
 
+        document.addEventListener('DOMContentLoaded', () => {
+            const header = document.querySelector('header');
+            const chatMessages = document.getElementById('chat-messages');
+
+            // Removed dynamic padding-top adjustment for chat-messages
+        });
         // Call initializeApp when DOM is loaded
         document.addEventListener('DOMContentLoaded', initializeApp);
+        const inputWrapper = document.querySelector('.chat-input-wrapper');
     </script>
 </body>
 </html> 
