@@ -83,7 +83,7 @@ class ChatService:
         
         openai.api_key = os.getenv("OPENAI_API_KEY")
         stream = await self.client.chat.completions.create(
-            model="gpt-4o-2024-08-06",
+            model="gpt-4o-mini-2024-07-18",
             messages=[{"role": "system", "content": prompt}],
             max_tokens=60,
             temperature=0.9,
@@ -410,7 +410,7 @@ class ChatService:
                 }
             ]
             stream = await self.client.chat.completions.create(
-                model="gpt-4o-2024-08-06",
+                model="gpt-4o-mini-2024-07-18",
                 messages=messages,
                 stream=True,
                 max_tokens=1000,

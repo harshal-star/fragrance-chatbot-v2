@@ -31,13 +31,13 @@ async def generate_response(session: Dict, message: str, db: Session) -> AsyncGe
             {"role": "system", "content": get_system_prompt()}
         ] + format_conversation_history(session["conversation_history"])
 
-        print(30 * "------------")
-        print(messages)
-        print(30 * "------------")
+        # print(30 * "------------")
+        # print(messages)
+        # print(30 * "------------")
         
         # Call OpenAI API with streaming
         stream = client.chat.completions.create(
-            model="gpt-4o-2024-08-06",  # Use the correct model name
+            model="gpt-4o-mini-2024-07-18",  # Use the correct model name
             messages=messages,
             stream=True,
             temperature=0.8,
@@ -52,6 +52,9 @@ async def generate_response(session: Dict, message: str, db: Session) -> AsyncGe
         last_yield_time = time.time()
         
         for chunk in stream:
+            print(30 * "------------")
+            print("BACKEND CHUNK:", chunk)
+            print(30 * "------------")
             if chunk.choices[0].delta.content is not None:
                 content = chunk.choices[0].delta.content
                 buffer += content

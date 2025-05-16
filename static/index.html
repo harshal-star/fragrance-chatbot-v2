@@ -3,13 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <title>Lila - Your Personal Fragrance Stylist</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Marked.js for Markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Setup Marked configuration -->
+    <script>
+        marked.setOptions({
+        breaks: true,          // Convert \n to <br>
+        gfm: true              // Enable GitHub Flavored Markdown
+        });
+    </script>
+
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
     <script>
       tailwind.config = {
@@ -90,6 +97,7 @@
             background: var(--card-bg);
             color: var(--text-main);
             transition: background 0.5s, color 0.5s;
+            white-space: pre-wrap; /* Preserve newlines and spaces */
         }
         .message.self-end .message-content {
             background: var(--bubble-user);
@@ -667,9 +675,18 @@
         localStorage.setItem('userId', userId);
 
         function formatMessage(message) {
-            // Use marked to convert markdown to HTML
-            return marked.parse(message);
+            console.log("📦 Raw message before rendering:", message);
+            try {
+                const unescaped = JSON.parse(`"${message}"`);
+                console.log("🧼 Unescaped message:", unescaped);
+                return DOMPurify.sanitize(marked.parse(unescaped));
+            } catch (err) {
+                console.warn("⚠️ Unescape failed:", err);
+                return DOMPurify.sanitize(marked.parse(message));
+            }
         }
+
+
 
         function getTimestamp() {
             const now = new Date();
@@ -745,10 +762,44 @@
 
         function updateStreamingResponse(formattedText) {
             if (currentStreamingMessage) {
-                    currentStreamingMessage.innerHTML = formattedText + '<span class="streaming-cursor">|</span>';
+                // Replace literal '\n' with actual newlines and preserve whitespace
+                // Handle any pattern containing \n\n by preserving the text before it and adding newlines
+                const textWithNewlines = formattedText
+                    .replace(/(.*?)\n\n/g, '$1\n\n')  // Handle any text followed by \n\n
+                    .replace(/\\n/g, '\n')  // Handle literal \n
+                    .replace(/ \n\n/g, ' \n\n');  // Handle space followed by \n\n
+                // Use white-space: pre-wrap to preserve newlines and spaces
+                currentStreamingMessage.style.whiteSpace = 'pre-wrap';
+                currentStreamingMessage.innerHTML = textWithNewlines + '<span class="streaming-cursor">|</span>';
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
             }
+        }
+        
+
+        // Add recommendation trigger detection and auto-send logic
+        const recommendationTriggers = [
+          "mix the magic",
+          "perfect little scent story brewing",
+          "let me whip up",
+          "just a sec while I",
+          "hold on while I",
+          "I feel like I've got the perfect little scent story brewing",
+          // Add more as needed
+        ];
+
+        function isRecommendationTrigger(message) {
+          return recommendationTriggers.some(trigger =>
+            message.toLowerCase().includes(trigger)
+          );
+        }
+
+        function maybeTriggerRecommendation(latestBotMessage) {
+          if (isRecommendationTrigger(latestBotMessage)) {
+            setTimeout(() => {
+              sendMessage("__TRIGGER_RECOMMENDATION__");
+            }, 1200); // 1.2s delay for realism
+          }
         }
 
         function endStreamingResponse() {
@@ -765,6 +816,9 @@
                     timestamp.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     parent.appendChild(timestamp);
                 }
+                // Get the latest bot message text
+                const latestBotMessage = currentStreamingMessage.innerText || currentStreamingMessage.textContent || "";
+                maybeTriggerRecommendation(latestBotMessage);
                 currentStreamingMessage = null;
                 scrollToBottomSmooth();
             }
@@ -823,13 +877,20 @@
                         }
                     } else if (line.startsWith('data: ')) {
                         const data = line.slice(6);
-                        botMessage += data; // Accumulate streamed chunks
+
+                        // botMessage += data;
+                        // botMessage += data + '\n'; 
+                        if (data.trim() === '') {            // packet is truly blank
+                            botMessage += '\n\n';           //    → generate a Markdown blank line
+                            } else {
+                                botMessage += data;             // normal text → keep it verbatim
+                            }
                         if (!streamingStarted) {
                             currentStreamingMessage = startStreamingResponse();
                             streamingStarted = true;
                         }
-                        const safeHTML = DOMPurify.sanitize(marked.parse(botMessage));
-                        updateStreamingResponse(safeHTML);
+
+                        updateStreamingResponse(DOMPurify.sanitize(marked.parse(botMessage)));
                         scrollToBottomSmooth();
                     }
                 }
@@ -837,7 +898,10 @@
             endStreamingResponse();
             // Finalize the streaming message with full formatting
             if (currentStreamingMessage) {
-                currentStreamingMessage.innerHTML = formatMessage(botMessage);
+                const cleaned = botMessage.replace(/\\n/g, '\n');
+                console.log('🧾 Final rawMarkdown to render:', botMessage);
+                const finalHTML = DOMPurify.sanitize(marked.parse(cleaned));
+                currentStreamingMessage.innerHTML = finalHTML;
                 currentStreamingMessage = null;
             }
             await loadSessionList(); // Refresh the left panel after streaming welcome message
@@ -940,33 +1004,55 @@
                         if (done) break;
                         
                         const chunk = decoder.decode(value);
-                        console.log('Received chunk:', chunk); // Debug log
-                        
+               
                         const lines = chunk.split('\n');
                         for (const line of lines) {
                             if (line.startsWith('data: ')) {
-                                const data = line.slice(6);
-                                rawMarkdown += data;
+                            const data = line.slice(6);
+                            console.log('📦 Chunk content:', JSON.stringify(data).replace(/\n/g, '\\n'));
 
-                                if (!streamingStarted) {
-                                    currentStreamingMessage = startStreamingResponse();
-                                    streamingStarted = true;
-                                }
-
-                                const html = DOMPurify.sanitize(marked.parse(rawMarkdown));
-                                updateStreamingResponse(html);
-                                scrollToBottomSmooth();
+                            if (data.trim() === '') {
+                                rawMarkdown += '\n\n';  // Add double newline for markdown paragraph breaks
+                            } else {
+                                // Handle any pattern containing \n\n by preserving the text before it and adding newlines
+                                const processedData = data
+                                    .replace(/(.*?)\n\n/g, '$1\n\n')  // Handle any text followed by \n\n
+                                    .replace(/\\n/g, '\n')  // Handle literal \n
+                                    .replace(/ \n\n/g, ' \n\n');  // Handle space followed by \n\n
+                                rawMarkdown += processedData;
                             }
+
+                            if (!streamingStarted) {
+                                currentStreamingMessage = startStreamingResponse();
+                                streamingStarted = true;
+                            }
+
+                            // Parse markdown and preserve whitespace
+                            const parsed = marked.parse(rawMarkdown);
+                            const safeHTML = DOMPurify.sanitize(parsed, {
+                                ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+                                ALLOWED_ATTR: [],
+                                KEEP_CONTENT: true,
+                                ALLOW_WHITESPACE: true
+                            });
+
+                            updateStreamingResponse(safeHTML);
+                            scrollToBottomSmooth();
+                            }
+
                         }
+
                     }
 
-                    // Final rendering after complete message is received
                     if (currentStreamingMessage) {
+                        // const cleaned = rawMarkdown.replace(/\\n/g, '\n');
+                        console.log('🧾 Final rawMarkdown to render:', rawMarkdown);
                         const finalHTML = DOMPurify.sanitize(marked.parse(rawMarkdown));
                         currentStreamingMessage.innerHTML = finalHTML;
                         endStreamingResponse();
                     }
-                    
+
+                
                     hideTypingIndicator();
                     await loadSessionList(); // Refresh the session list after new message
                     

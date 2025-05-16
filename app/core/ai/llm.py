@@ -65,7 +65,7 @@ class LLMService:
             "seed": 25,
             "stream": False,  # Changed to False to get complete response at once
             "messages": messages,
-            "model": "gpt-4o-2024-08-06",  # Using the vision model directly
+            "model": "gpt-4o-mini-2024-07-18",  # Using the vision model directly
             "timeout": 60,
             "max_tokens": 1000,
             "temperature": 0.7
