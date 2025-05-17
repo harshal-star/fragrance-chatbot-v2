@@ -820,7 +820,7 @@
                 currentStreamingMessage.style.justifyContent = '';
                 currentStreamingMessage.style.minHeight = 'auto';
                 currentStreamingMessage.style.paddingBottom = '0';
-                
+
                 // First, normalize all newline patterns
                 let textWithNewlines = formattedText
                     // Handle any combination of spaces and newlines
@@ -840,7 +840,6 @@
             }
         }
         
-
         // Add recommendation trigger detection and auto-send logic
         const recommendationTriggers = [
           "mix the magic",
@@ -1122,6 +1121,14 @@
 
                     if (currentStreamingMessage) {
                         // const cleaned = rawMarkdown.replace(/\\n/g, '\n');
+                        const normalized = rawMarkdown
+                        .replace(/\s*\n\s*\n\s*/g, '\n\n')  // Normalize paragraph breaks
+                        .replace(/\s*\n\s*/g, '\n')         // Normalize single line breaks
+                        .replace(/\\n/g, '\n')              // Convert literal \n to real line breaks
+                        .replace(/([^\\])\n/g, '$1\n')      // Normalize edge newlines
+                        .replace(/\n([^\\])/g, '\n$1')      // Normalize edge newlines
+                        .replace(/([^\\])\n\n/g, '$1\n\n')  // Normalize
+                        .replace(/\n\n([^\\])/g, '\n\n$1'); // Normalize
                         console.log('🧾 Final rawMarkdown to render:', rawMarkdown);
                         const finalHTML = DOMPurify.sanitize(marked.parse(rawMarkdown));
                         currentStreamingMessage.innerHTML = finalHTML;
