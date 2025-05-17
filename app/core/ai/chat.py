@@ -52,9 +52,9 @@ async def generate_response(session: Dict, message: str, db: Session) -> AsyncGe
         last_yield_time = time.time()
         
         for chunk in stream:
-            print(30 * "------------")
+            print(15 * "--")
             print("BACKEND CHUNK:", chunk)
-            print(30 * "------------")
+            print(15 * "--")
             if chunk.choices[0].delta.content is not None:
                 content = chunk.choices[0].delta.content
                 buffer += content

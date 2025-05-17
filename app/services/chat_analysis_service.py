@@ -24,13 +24,13 @@ class ChatAnalysisService:
     async def analyze_chat_messages(self, user_id: str, messages: List[Dict]) -> None:
         """Analyze chat messages to extract user profile information"""
         try:
-            logger.info(f"Structured extraction input for user {user_id}: {messages}")
+            # logger.info(f"Structured extraction input for user {user_id}: {messages}")
             # Combine all user messages into a single string
             combined_message = " ".join([msg["content"] for msg in messages if msg["role"] in ["user", "system"]])
             logger.info(f"Combined message for extraction: {combined_message}")
             logger.info("Calling OpenAI extraction...")
             extracted_data = await self.openai_extraction.extract_profile_data(combined_message)
-            logger.info(f"Structured extraction result for user {user_id}: {extracted_data}")
+            # logger.info(f"Structured extraction result for user {user_id}: {extracted_data}")
             await self._process_extracted_data(user_id, extracted_data)
         except Exception as e:
             logger.error(f"Error analyzing chat messages: {str(e)}")
