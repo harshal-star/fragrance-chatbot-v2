@@ -138,44 +138,46 @@
             align-items: flex-start;
         }
 
-        /* Loading dots animation */
-        .loading-dots {
-            display: inline-flex;
+        /* Elegant typing wave animation */
+        .typing-indicator {
+            display: flex;
             align-items: center;
-            gap: 4px;
-            padding: 8px 12px;
+            gap: 6px;
+            padding: 10px 16px;
+            background-color: transparent !important;
             background: transparent !important;
             border-radius: 18px;
             box-shadow: none !important;
-            margin: 4px 0;
+            min-height: 40px;
+            margin: 8px 0;
             padding: 0 !important;
         }
 
-        .loading-dots span {
+        .typing-indicator span {
             width: 8px;
             height: 8px;
             background: var(--accent);
             border-radius: 50%;
-            animation: loadingDots 1.4s infinite ease-in-out both;
-            opacity: 0.7;
+            animation: wave 1.2s infinite ease-in-out;
+            opacity: 0.6;
         }
 
-        .loading-dots span:nth-child(1) {
-            animation-delay: -0.32s;
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.15s;
         }
 
-        .loading-dots span:nth-child(2) {
-            animation-delay: -0.16s;
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.3s;
         }
 
-        @keyframes loadingDots {
-            0%, 80%, 100% { 
-                transform: scale(0);
+        @keyframes wave {
+            0%, 100% {
+                transform: translateY(0px);
                 opacity: 0.3;
             }
-            40% { 
-                transform: scale(1);
-                opacity: 0.7;
+            50% {
+                transform: translateY(-6px);
+                opacity: 1;
             }
         }
 
@@ -623,6 +625,44 @@
         border-color: #a78bfa;
         }
 
+        /* Loading dots animation */
+        .loading-dots {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 16px;
+            background: transparent;
+            border-radius: 18px;
+            box-shadow: none;
+        }
+
+        .loading-dots span {
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dots span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% { 
+                transform: scale(0);
+                opacity: 0.3;
+            }
+            40% { 
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
     </style>
 </head>
 <!-- <body class="bg-gradient-to-br from-primary-light to-white min-h-screen font-inter text-text-primary flex flex-col"> -->
@@ -798,21 +838,32 @@
             const messageContent = addMessage('', isUser, false, true);
             if (!isUser) {
                 // Add loading dots animation for bot messages
-                const loadingDots = document.createElement('div');
-                loadingDots.className = 'loading-dots';
-                loadingDots.innerHTML = '<span></span><span></span><span></span>';
-                messageContent.innerHTML = ''; // Clear any existing content
-                messageContent.appendChild(loadingDots);
+                const typingIndicator = document.createElement('div');
+                typingIndicator.className = 'typing-indicator';
+                typingIndicator.innerHTML = `
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                `;
+                messageContent.innerHTML = ''; // Clear previous content
+                messageContent.appendChild(typingIndicator);
+                // Ensure the typing indicator is visible
+                messageContent.style.display = 'flex';
+                messageContent.style.alignItems = 'center';
+                messageContent.style.justifyContent = 'flex-start';
+                messageContent.style.minHeight = '40px';
             }
             return messageContent;
         }
 
         function updateStreamingResponse(formattedText) {
             if (currentStreamingMessage) {
-                // Remove loading dots if they exist
-                const loadingDots = currentStreamingMessage.querySelector('.loading-dots');
-                if (loadingDots) {
-                    loadingDots.remove();
+                // Only remove loading dots if we have actual content to show
+                if (formattedText && formattedText.trim()) {
+                    const loadingDots = currentStreamingMessage.querySelector('.typing-indicator');
+                    if (loadingDots) {
+                        loadingDots.remove();
+                    }
                 }
 
                 currentStreamingMessage.style.display = '';
@@ -1323,15 +1374,24 @@
 
         function showThinkingDots() {
             const chatMessages = document.getElementById('chat-messages');
+            
+            // Remove any existing thinking dots
+            if (thinkingDotsElement) {
+                thinkingDotsElement.remove();
+            }
 
             thinkingDotsElement = document.createElement('div');
-            thinkingDotsElement.className = 'flex items-start mb-2 self-start';
-            thinkingDotsElement.innerHTML = `
-                <div class="loading-dots">
-                    <span></span><span></span><span></span>
-                </div>
+            thinkingDotsElement.className = 'message flex flex-col max-w-[85%] self-start items-start mb-2';
+            
+            const loadingDots = document.createElement('div');
+            loadingDots.className = 'loading-dots';
+            loadingDots.innerHTML = `
+                <span></span>
+                <span></span>
+                <span></span>
             `;
-
+            
+            thinkingDotsElement.appendChild(loadingDots);
             chatMessages.appendChild(thinkingDotsElement);
             scrollToBottomSmooth();
         }
